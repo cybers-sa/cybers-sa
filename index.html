@@ -6,13 +6,8 @@
 <title>CYBERS SA</title>
 
 <style>
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
-
 body{
+    margin:0;
     background:#07152d;
     color:white;
     font-family:Arial,sans-serif;
@@ -21,9 +16,8 @@ body{
 nav{
     display:flex;
     justify-content:space-between;
-    align-items:center;
-    padding:20px 50px;
-    border-bottom:1px solid #1e293b;
+    padding:20px 40px;
+    background:#08101f;
 }
 
 nav a{
@@ -39,51 +33,47 @@ nav a{
 
 .hero h1{
     font-size:64px;
-    margin-bottom:20px;
 }
 
 .hero p{
     max-width:700px;
     margin:auto;
     color:#cbd5e1;
-    line-height:1.8;
 }
 
 .btn{
     display:inline-block;
-    margin-top:30px;
+    margin-top:25px;
+    padding:14px 25px;
     background:#2563eb;
     color:white;
-    padding:15px 30px;
     text-decoration:none;
-    border-radius:10px;
-}
-
-.services{
-    display:flex;
-    gap:20px;
-    justify-content:center;
-    flex-wrap:wrap;
-    padding:50px 20px;
-}
-
-.card{
-    background:#0f172a;
-    padding:25px;
-    width:300px;
-    border-radius:15px;
+    border-radius:8px;
 }
 
 .section{
-    padding:80px 20px;
+    padding:60px 20px;
     text-align:center;
 }
 
+.cards{
+    display:flex;
+    justify-content:center;
+    gap:20px;
+    flex-wrap:wrap;
+}
+
+.card{
+    width:280px;
+    background:#0f172a;
+    padding:20px;
+    border-radius:12px;
+}
+
 footer{
-    border-top:1px solid #1e293b;
     text-align:center;
     padding:30px;
-    color:#94a3b8;
+    border-top:1px solid #1e293b;
 }
 </style>
 </head>
@@ -92,33 +82,26 @@ footer{
 
 <nav>
     <h2>CYBERS SA</h2>
-
     <div>
-        #home
+        ">Home</a>
         #services
         #about
-        #contact>
+        #contact
     </div>
 </nav>
 
 <section class="hero" id="home">
     <h1>CYBERS SA</h1>
-
     <p>
-        Professional Cybersecurity Services helping organizations
-        identify threats, reduce risks, strengthen defenses,
-        and protect critical business assets.
+        Professional Cybersecurity Services for Modern Businesses.
     </p>
-
-    #contact>
+    #contactRequest Consultation</a>
 </section>
 
-<section id="services" class="section">
+<section class="section" id="services">
+    <h2>Services</h2>
 
-    <h2>Our Services</h2>
-
-    <div class="services">
-
+    <div class="cards">
         <div class="card">
             <h3>Penetration Testing</h3>
             <p>Identify vulnerabilities before attackers do.</p>
@@ -126,41 +109,33 @@ footer{
 
         <div class="card">
             <h3>Security Assessment</h3>
-            <p>Evaluate your security posture and reduce risk.</p>
+            <p>Evaluate and strengthen your security posture.</p>
         </div>
 
         <div class="card">
             <h3>Security Awareness</h3>
-            <p>Train employees against modern cyber threats.</p>
+            <p>Train employees against cyber threats.</p>
         </div>
-
     </div>
-
 </section>
 
-<section id="about" class="section">
+<section class="section" id="about">
     <h2>About Us</h2>
-
     <p>
-        Cybers SA provides cybersecurity consulting,
-        vulnerability assessments, penetration testing,
-        and security awareness solutions for modern businesses.
+        Cybers SA provides cybersecurity consulting, risk assessment,
+        penetration testing, and security awareness services.
     </p>
 </section>
 
-<section id="contact" class="section">
+<section class="section" id="contact">
     <h2>Contact Us</h2>
-
     <p>Email: info@cybers-sa.com</p>
     <p>LinkedIn: Cybers SA</p>
-    <p>Saudi Arabia</p>
 </section>
 
 <footer>
-    © 2026 CYBERS SA. All Rights Reserved.
+    © 2026 CYBERS SA
 </footer>
 
 </body>
 </html>
-  );
-}
