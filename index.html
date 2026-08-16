@@ -1,85 +1,166 @@
-export default function CybersSA() {
-  return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* Navigation */}
-      <nav className="flex justify-between items-center px-8 py-6 border-b border-slate-800">
-        <h1 className="text-2xl font-bold">CYBERS SA</h1>
-        <div className="space-x-6">
-          <a href="#home" classNameserviceshover:text-blue-400">Services</a>
-          about" className="hover:text-blue-400">About</a>
-          #contact
-        </div>
-      </nav>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CYBERS SA</title>
 
-      {/* Hero Section */}
-      <section id="home" className="px-8 py-24 text-center">
-        <h2 className="text-5xl font-bold mb-4">CYBERS SA</h2>
-        <p className="text-xl text-slate-300 mb-6">
-          Cybersecurity Solutions for Modern Businesses
-        </p>
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
 
-        <p className="max-w-3xl mx-auto text-slate-400 mb-8">
-          We help organizations identify risks, strengthen defenses,
-          improve security posture, and protect critical business assets
-          through professional cybersecurity services.
-        </p>
+body{
+    background:#07152d;
+    color:white;
+    font-family:Arial,sans-serif;
+}
 
-        <button className="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-xl font-semibold">
-          Request Consultation
-        </button>
-      </section>
+nav{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:20px 50px;
+    border-bottom:1px solid #1e293b;
+}
 
-      {/* Services */}
-      <section
-        id="services"
-        className="grid md:grid-cols-3 gap-6 px-8 py-12 max-w-6xl mx-auto"
-      >
-        <div className="bg-slate-900 p-6 rounded-3xl">
-          <h3 className="text-xl font-semibold mb-2">Penetration Testing</h3>
-          <p className="text-slate-400">
-            Identify vulnerabilities before attackers do.
-          </p>
-        </div>
+nav a{
+    color:white;
+    text-decoration:none;
+    margin-left:20px;
+}
 
-        <div className="bg-slate-900 p-6 rounded-3xl">
-          <h3 className="text-xl font-semibold mb-2">Security Assessment</h3>
-          <p className="text-slate-400">
-            Evaluate and strengthen your security posture.
-          </p>
-        </div>
+.hero{
+    text-align:center;
+    padding:120px 20px;
+}
 
-        <div className="bg-slate-900 p-6 rounded-3xl">
-          <h3 className="text-xl font-semibold mb-2">Security Awareness</h3>
-          <p className="text-slate-400">
-            Train employees against modern cyber threats.
-          </p>
-        </div>
-      </section>
+.hero h1{
+    font-size:64px;
+    margin-bottom:20px;
+}
 
-      {/* About */}
-      <section id="about" className="px-8 py-16 text-center max-w-4xl mx-auto">
-        <h2 className="text-3xl font-bold mb-4">About Us</h2>
-        <p className="text-slate-300">
-          Cybers SA provides cybersecurity consulting, risk assessment,
-          penetration testing, and security awareness services to help
-          organizations stay protected in an evolving threat landscape.
-        </p>
-      </section>
+.hero p{
+    max-width:700px;
+    margin:auto;
+    color:#cbd5e1;
+    line-height:1.8;
+}
 
-      {/* Contact */}
-      <section id="contact" className="px-8 py-16 text-center">
-        <h2 className="text-3xl font-bold mb-6">Contact Us</h2>
+.btn{
+    display:inline-block;
+    margin-top:30px;
+    background:#2563eb;
+    color:white;
+    padding:15px 30px;
+    text-decoration:none;
+    border-radius:10px;
+}
 
-        <div className="space-y-3 text-slate-300">
-          <p>📧 info@cybers-sa.com</p>
-          <p>📱 +966 XX XXX XXXX</p>
-          <p>🔗 LinkedIn: Cybers SA</p>
-        </div>
-      </section>
+.services{
+    display:flex;
+    gap:20px;
+    justify-content:center;
+    flex-wrap:wrap;
+    padding:50px 20px;
+}
 
-      <footer className="border-t border-slate-800 py-8 text-center text-slate-400">
-        © 2026 Cybers SA. All Rights Reserved.
-      </footer>
+.card{
+    background:#0f172a;
+    padding:25px;
+    width:300px;
+    border-radius:15px;
+}
+
+.section{
+    padding:80px 20px;
+    text-align:center;
+}
+
+footer{
+    border-top:1px solid #1e293b;
+    text-align:center;
+    padding:30px;
+    color:#94a3b8;
+}
+</style>
+</head>
+
+<body>
+
+<nav>
+    <h2>CYBERS SA</h2>
+
+    <div>
+        #home
+        #services
+        #about
+        #contact>
     </div>
+</nav>
+
+<section class="hero" id="home">
+    <h1>CYBERS SA</h1>
+
+    <p>
+        Professional Cybersecurity Services helping organizations
+        identify threats, reduce risks, strengthen defenses,
+        and protect critical business assets.
+    </p>
+
+    #contact>
+</section>
+
+<section id="services" class="section">
+
+    <h2>Our Services</h2>
+
+    <div class="services">
+
+        <div class="card">
+            <h3>Penetration Testing</h3>
+            <p>Identify vulnerabilities before attackers do.</p>
+        </div>
+
+        <div class="card">
+            <h3>Security Assessment</h3>
+            <p>Evaluate your security posture and reduce risk.</p>
+        </div>
+
+        <div class="card">
+            <h3>Security Awareness</h3>
+            <p>Train employees against modern cyber threats.</p>
+        </div>
+
+    </div>
+
+</section>
+
+<section id="about" class="section">
+    <h2>About Us</h2>
+
+    <p>
+        Cybers SA provides cybersecurity consulting,
+        vulnerability assessments, penetration testing,
+        and security awareness solutions for modern businesses.
+    </p>
+</section>
+
+<section id="contact" class="section">
+    <h2>Contact Us</h2>
+
+    <p>Email: info@cybers-sa.com</p>
+    <p>LinkedIn: Cybers SA</p>
+    <p>Saudi Arabia</p>
+</section>
+
+<footer>
+    © 2026 CYBERS SA. All Rights Reserved.
+</footer>
+
+</body>
+</html>
   );
 }
