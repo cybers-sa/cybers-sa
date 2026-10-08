@@ -75,7 +75,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
 .soc a:hover{border-color:var(--accent)}
 .soc svg{width:18px;height:18px;stroke:var(--text);fill:none;stroke-width:1.8}
 .note{font-size:12px;color:var(--muted);margin-top:8px}
-.dim{opacity:.55}.row{display:flex;justify-content:space-between;align-items:center;gap:8px}.st{font-size:12px;padding:3px 10px;border-radius:99px}.st.open{background:#35c48a22;color:#35c48a}.st.soon{background:#f5a52422;color:#f5a524}.st.closed,.st.ended{background:#8884;color:var(--muted)}.card .btn{align-self:flex-start}
+.dim{opacity:.55}dialog{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:16px;max-width:600px;width:calc(100% - 28px);padding:20px}dialog::backdrop{background:#000a}dialog input,dialog select,dialog textarea{width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit}dialog label{font-size:13px;color:var(--muted);display:block}.fg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.fg .w{grid-column:1/-1}.hp{position:absolute;left:-9999px;opacity:0}#fmsg{color:var(--accent2);font-size:14px}@media(max-width:600px){.fg{grid-template-columns:1fr}}.logos{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}.lg{background:var(--card);border:1px solid var(--line);border-radius:16px;height:96px;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;color:var(--muted);font-weight:600}.lg:hover{border-color:var(--accent)}.lg.has{background:#fff}.lg img{max-width:100%;max-height:60px;object-fit:contain}.lg i{width:42px;height:42px;border-radius:12px;background:color-mix(in srgb,var(--accent) 18%,transparent);display:grid;place-items:center;font-style:normal;color:var(--accent2);font-weight:700}.row{display:flex;justify-content:space-between;align-items:center;gap:8px}.st{font-size:12px;padding:3px 10px;border-radius:99px}.st.open{background:#35c48a22;color:#35c48a}.st.soon{background:#f5a52422;color:#f5a524}.st.closed,.st.ended{background:#8884;color:var(--muted)}.card .btn{align-self:flex-start}
 @media(max-width:700px){.links{display:none}}
 </style>
 </head>
@@ -83,7 +83,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
 <header><div class="wrap nav">
   <a class="brand" href="#top">
     <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent2)"><circle cx="24" cy="24" r="19"/><path d="M24 11l-9 3v8c0 7 4 11 9 13 5-2 9-6 9-13v-8z"/><rect x="19" y="21" width="10" height="8" rx="1.5"/><path d="M21 21v-3a3 3 0 016 0v3"/></svg>
-    <span>CYBERS_SA</span></a>
+    <span id="bn"></span></a>
   <nav class="links"><a href="#events" data-i="n1"></a><a href="#about" data-i="n2"></a><a href="#roadmap" data-i="n3"></a><a href="#submit" data-i="n4"></a></nav>
   <div class="tools"><button class="btn" id="lang">EN</button><button class="btn" id="theme" aria-label="theme">◐</button></div>
 </div></header>
@@ -102,6 +102,8 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
   
 </div></section>
 
+<section id="partners"><div class="wrap"><h2 data-i="pt"></h2><div class="logos" id="logos"></div></div></section>
+
 <section id="about"><div class="wrap">
   <h2 data-i="n2"></h2>
   <div class="cols">
@@ -118,34 +120,60 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
 
 <section id="submit"><div class="wrap"><div class="cta">
   <h2 data-i="c1"></h2><p style="color:var(--muted)" data-i="c2"></p>
-  <a class="btn p" href="mailto:contact@example.com" data-i="c3"></a>
+  <button class="btn p" id="openForm" data-i="c3"></button>
 </div></div></section>
+
+
+<dialog id="dlg"><form id="sf"><h2 data-i="c1" style="margin:0"></h2>
+<div class="fg">
+<div><label data-i="f_type"></label><select id="f_type"></select></div>
+<div><label data-i="f_city"></label><select id="f_city"></select></div>
+<div class="w"><label data-i="f_title_ar"></label><input id="f_title_ar" required maxlength="200"></div>
+<div class="w"><label data-i="f_title_en"></label><input id="f_title_en" maxlength="200" dir="ltr"></div>
+<div><label data-i="f_mode"></label><select id="f_mode"></select></div>
+<div><label data-i="f_org"></label><input id="f_org" required maxlength="200"></div>
+<div><label data-i="f_start"></label><input type="date" id="f_start_date" required></div>
+<div><label data-i="f_end"></label><input type="date" id="f_end_date"></div>
+<div><label data-i="f_dl"></label><input type="date" id="f_deadline"></div>
+<div><label data-i="f_link"></label><input id="f_link" type="url" required dir="ltr" placeholder="https://"></div>
+<div class="w"><label data-i="f_contact"></label><input id="f_contact" required maxlength="200"></div>
+<div class="w"><label data-i="f_notes"></label><input id="f_notes" maxlength="300"></div>
+<input class="hp" id="f_website" tabindex="-1" autocomplete="off" aria-hidden="true">
+</div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn p" id="fsend" data-i="f_send"></button><button type="button" class="btn" id="fcancel" data-i="f_cancel"></button><span id="fmsg"></span></div>
+</form></dialog>
 
 <footer><div class="wrap foot">
   <div id="rights"></div>
   <div class="soc">
-    <a href="#" aria-label="X"><svg viewBox="0 0 24 24"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
-    <a href="#" aria-label="Mail"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></a>
-    <a href="#" aria-label="Telegram"><svg viewBox="0 0 24 24"><path d="M21 4L3 11l6 2 2 6 3-4 5 3z"/></svg></a>
-    <a href="#" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 10v7M8 7v.01M12 17v-4a2 2 0 014 0v4M12 10v7"/></svg></a>
+    <a href="https://x.com/Cybers_SA" target="_blank" rel="noopener" aria-label="X"><svg viewBox="0 0 24 24"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+    <a href="https://t.me/Cybers_SA" target="_blank" rel="noopener" aria-label="Telegram"><svg viewBox="0 0 24 24"><path d="M21 4L3 11l6 2 2 6 3-4 5 3z"/></svg></a>
+    <a href="https://www.linkedin.com/company/cybers-sa" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 10v7M8 7v.01M12 17v-4a2 2 0 014 0v4M12 10v7"/></svg></a>
   </div>
 </div></footer>
 
 <script>
 const T={
-ar:{n1:"الفعاليات",n2:"عن المنصة",n3:"خطتنا القادمة",n4:"أضف فعالية",h1:"كل فعاليات الأمن السيبراني المجانية في السعودية… في مكان واحد",h2:"معسكرات، ورش، برامج وفعاليات مجانية، نجمعها لك ونحدثها باستمرار.",ph:"ابحث عن فعالية أو معسكر…",browse:"تصفح",st1:"فعالية",st2:"مجاني",st3:"منطقة",all:"الكل",ev:"فعالية",bc:"معسكر",ws:"ورشة",pg:"برنامج",cityAll:"كل المدن",modeAll:"حضوري / عن بُعد",onsite:"حضوري",online:"عن بُعد",free:"مجاني",s_open:"التسجيل مفتوح",s_soon:"يغلق قريبًا",s_closed:"التسجيل مغلق",s_ended:"انتهت",dl:"آخر موعد",reg:"سجّل الآن",past:"إظهار الفعاليات المنتهية",none:"لا توجد نتائج مطابقة.",demo:"* البيانات الحالية تجريبية لعرض التصميم، وتُستبدل ببيانات حقيقية.",a1t:"اكتشف",a1:"دليل واحد يجمع الفعاليات بدل التنقل بين الحسابات والمنصات.",a2t:"موثوق",a2:"نراجع كل فعالية قبل نشرها ونوضح الجهة المنظمة ورابط التسجيل.",a3t:"للجميع",a3:"موقع بالعربية والإنجليزية، مناسب للطلاب والمبتدئين والمحترفين.",c1:"عندك فعالية أو معسكر؟",c2:"أرسل التفاصيل وننشرها مجانًا لتصل للمجتمع التقني.",c3:"أرسل فعاليتك",road:["الآن: دليل الفعاليات مع البحث والتصنيف والمدن","قريبًا: تقويم وتنبيهات بالبريد وتيليجرام قبل الفعالية","ثم: نموذج تقديم فعاليات من المنظمين مع مراجعة","لاحقًا: حسابات ومفضلة وخريطة الفعاليات","مستقبلًا: دليل مصادر تعلم، وتحديات CTF، ومجتمع نقاش"],rights:"© 2026 CYBERS_SA. جميع الحقوق محفوظة."},
-en:{n1:"Events",n2:"About",n3:"Roadmap",n4:"Submit",h1:"Every free cyber security event in Saudi Arabia, in one place",h2:"Bootcamps, workshops, programs and events: collected and constantly updated.",ph:"Search events or bootcamps…",browse:"Browse",st1:"Events",st2:"Free",st3:"Regions",all:"All",ev:"Event",bc:"Bootcamp",ws:"Workshop",pg:"Program",cityAll:"All cities",modeAll:"Onsite / Online",onsite:"Onsite",online:"Online",free:"Free",s_open:"Registration open",s_soon:"Closing soon",s_closed:"Registration closed",s_ended:"Ended",dl:"Deadline",reg:"Register now",past:"Show past events",none:"No matching results.",demo:"* Current data is placeholder to showcase the design.",a1t:"Discover",a1:"One directory instead of hopping between accounts and platforms.",a2t:"Trusted",a2:"Every listing is reviewed, with organizer and registration link shown.",a3t:"For everyone",a3:"Arabic and English, built for students, beginners and professionals.",c1:"Running an event or bootcamp?",c2:"Send the details and we'll list it for free to reach the community.",c3:"Submit your event",road:["Now: events directory with search, filters and cities","Soon: calendar plus email/Telegram reminders","Then: organizer submission form with review","Later: accounts, favorites and an events map","Future: learning resources, CTF challenges, community"],rights:"© 2026 CYBERS_SA. All rights reserved."}};
+ar:{brand:"سايبرز",f_type:"النوع",f_city:"المدينة",f_title_ar:"اسم الفعالية (عربي) *",f_title_en:"اسم الفعالية (English)",f_mode:"الحضور",f_org:"الجهة المنظمة *",f_start:"تاريخ البداية *",f_end:"تاريخ النهاية",f_dl:"آخر موعد للتسجيل",f_link:"رابط التسجيل *",f_contact:"وسيلة تواصل معك (بريد أو جوال) *",f_notes:"ملاحظات",f_send:"إرسال",f_cancel:"إلغاء",sent:"وصلنا طلبك، سنراجعه وننشره قريبًا ✓",err:"تعذر الإرسال، تأكد من الحقول وحاول لاحقًا",limit:"أرسلت عدة طلبات، حاول بعد ساعة",pt:"الجهات المنظمة معنا",n1:"الفعاليات",n2:"عن المنصة",n3:"خطتنا القادمة",n4:"أضف فعالية",h1:"كل فعاليات الأمن السيبراني المجانية في السعودية… في مكان واحد",h2:"معسكرات، ورش، برامج وفعاليات مجانية، نجمعها لك ونحدثها باستمرار.",ph:"ابحث عن فعالية أو معسكر…",browse:"تصفح",st1:"فعالية",st2:"مجاني",st3:"منطقة",all:"الكل",ev:"فعالية",bc:"معسكر",ws:"ورشة",pg:"برنامج",cityAll:"كل المدن",modeAll:"حضوري / عن بُعد",onsite:"حضوري",online:"عن بُعد",free:"مجاني",s_open:"التسجيل مفتوح",s_soon:"يغلق قريبًا",s_closed:"التسجيل مغلق",s_ended:"انتهت",dl:"آخر موعد",reg:"سجّل الآن",past:"إظهار الفعاليات المنتهية",none:"لا توجد نتائج مطابقة.",demo:"* البيانات الحالية تجريبية لعرض التصميم، وتُستبدل ببيانات حقيقية.",a1t:"اكتشف",a1:"دليل واحد يجمع الفعاليات بدل التنقل بين الحسابات والمنصات.",a2t:"موثوق",a2:"نراجع كل فعالية قبل نشرها ونوضح الجهة المنظمة ورابط التسجيل.",a3t:"للجميع",a3:"موقع بالعربية والإنجليزية، مناسب للطلاب والمبتدئين والمحترفين.",c1:"عندك فعالية أو معسكر؟",c2:"عبّي النموذج وسنراجع فعاليتك وننشرها مجانًا لتصل للمجتمع التقني.",c3:"أرسل فعاليتك",road:["الآن: دليل الفعاليات مع البحث والتصنيف والمدن","قريبًا: تقويم وتنبيهات بالبريد وتيليجرام قبل الفعالية","ثم: نموذج تقديم فعاليات من المنظمين مع مراجعة","لاحقًا: حسابات ومفضلة وخريطة الفعاليات","مستقبلًا: دليل مصادر تعلم، وتحديات CTF، ومجتمع نقاش"],rights:"© 2026 سايبرز. جميع الحقوق محفوظة."},
+en:{brand:"Cybers_SA",f_type:"Type",f_city:"City",f_title_ar:"Title (Arabic) *",f_title_en:"Title (English)",f_mode:"Format",f_org:"Organizer *",f_start:"Start date *",f_end:"End date",f_dl:"Registration deadline",f_link:"Registration link *",f_contact:"Your contact (email or phone) *",f_notes:"Notes",f_send:"Submit",f_cancel:"Cancel",sent:"Received! We will review and publish it soon ✓",err:"Could not send, check the fields and try again",limit:"Too many requests, try again in an hour",pt:"Organizers with us",n1:"Events",n2:"About",n3:"Roadmap",n4:"Submit",h1:"Every free cyber security event in Saudi Arabia, in one place",h2:"Bootcamps, workshops, programs and events: collected and constantly updated.",ph:"Search events or bootcamps…",browse:"Browse",st1:"Events",st2:"Free",st3:"Regions",all:"All",ev:"Event",bc:"Bootcamp",ws:"Workshop",pg:"Program",cityAll:"All cities",modeAll:"Onsite / Online",onsite:"Onsite",online:"Online",free:"Free",s_open:"Registration open",s_soon:"Closing soon",s_closed:"Registration closed",s_ended:"Ended",dl:"Deadline",reg:"Register now",past:"Show past events",none:"No matching results.",demo:"* Current data is placeholder to showcase the design.",a1t:"Discover",a1:"One directory instead of hopping between accounts and platforms.",a2t:"Trusted",a2:"Every listing is reviewed, with organizer and registration link shown.",a3t:"For everyone",a3:"Arabic and English, built for students, beginners and professionals.",c1:"Running an event or bootcamp?",c2:"Fill in the form, we review your event and list it for free.",c3:"Submit your event",road:["Now: events directory with search, filters and cities","Soon: calendar plus email/Telegram reminders","Then: organizer submission form with review","Later: accounts, favorites and an events map","Future: learning resources, CTF challenges, community"],rights:"© 2026 Cybers_SA. All rights reserved."}};
 const CITY={ar:{r:"الرياض",j:"جدة",d:"الدمام",k:"الخبر",m:"المدينة",o:"عن بُعد"},en:{r:"Riyadh",j:"Jeddah",d:"Dammam",k:"Khobar",m:"Madinah",o:"Remote"}};
 let D=[];
+// الجهات المنظمة: أضف شعار الجهة برفع الصورة في المستودع ثم اكتب اسمها في logo، مثل "logo-tuwaiq.png"
+const PARTNERS=[
+{name:{ar:"الجهة الأولى",en:"Partner 1"},logo:"",url:""},
+{name:{ar:"الجهة الثانية",en:"Partner 2"},logo:"",url:""},
+{name:{ar:"الجهة الثالثة",en:"Partner 3"},logo:"",url:""},
+{name:{ar:"الجهة الرابعة",en:"Partner 4"},logo:"",url:""}];
 let lang="ar",type="all";
 const $=s=>document.querySelector(s);
 function render(){
  const t=T[lang];document.documentElement.lang=lang;document.documentElement.dir=lang=="ar"?"rtl":"ltr";
  document.querySelectorAll("[data-i]").forEach(e=>e.textContent=t[e.dataset.i]);
  $("#q").placeholder=t.ph;$("#lang").textContent=lang=="ar"?"EN":"عربي";
- $("#rights").textContent=t.rights;$("#s1").textContent=D.length;
+ $("#rights").textContent=t.rights;if($("#f_type"))formOpts();$("#bn").textContent=t.brand;
+ $("#logos").innerHTML=PARTNERS.map(p=>{const n=esc(p.name[lang]);return p.logo?`<${p.url?'a href="'+esc(p.url)+'" target="_blank" rel="noopener"':'div'} class="lg has"><img src="${esc(p.logo)}" alt="${n}"></${p.url?'a':'div'}>`:`<div class="lg"><i>${n.charAt(0)}</i><span>${n}</span></div>`}).join("");$("#s1").textContent=D.length;
  $("#road").innerHTML=t.road.map(x=>"<li>"+x+"</li>").join("");
- $("#types").innerHTML=["all","ev","bc","ws","pg"].map(k=>`<button class="chip ${type==k?"on":""}" onclick="type='${k}';render()">${t[k]}</button>`).join("");
+ $("#types").innerHTML=["all","ev","bc","ws","pg"].map(k=>`<button class="chip ${type==k?"on":""}" data-k="${k}">${t[k]}</button>`).join("");
  const cs=$("#city").value||"",ms=$("#mode").value||"";
  $("#city").innerHTML=`<option value="">${t.cityAll}</option>`+Object.keys(CITY[lang]).map(k=>`<option value="${k}" ${cs==k?"selected":""}>${CITY[lang][k]}</option>`).join("");
  $("#mode").innerHTML=`<option value="">${t.modeAll}</option><option value="onsite" ${ms=="onsite"?"selected":""}>${t.onsite}</option><option value="online" ${ms=="online"?"selected":""}>${t.online}</option>`;
@@ -158,14 +186,25 @@ function st(e){const n=new Date(new Date().toDateString()),en=new Date(e.end||e.
 function list(){
  const t=T[lang],q=$("#q").value.toLowerCase(),c=$("#city").value,m=$("#mode").value,past=$("#past").checked;
  const r=D.map(e=>({...e,s:st(e)})).filter(e=>(past||e.s!="ended")&&(type=="all"||e.type==type)&&(!c||e.city==c)&&(!m||e.mode==m)&&(e.title[lang]||"").toLowerCase().includes(q)).sort((a,b)=>a.start.localeCompare(b.start));
- $("#list").innerHTML=r.length?r.map(e=>`<div class="card ${e.s=="ended"?"dim":""}"><div class="row"><span class="tag">${t[e.type]}</span><span class="st ${e.s}">${t["s_"+e.s]}</span></div><h3>${esc(e.title[lang])}</h3><div class="meta"><span>📅 ${e.start}${e.end&&e.end!=e.start?" → "+e.end:""}</span><span>📍 ${CITY[lang][e.city]} · ${t[e.mode]}</span><span>🏢 ${esc(e.org)}</span>${e.deadline?`<span>⏳ ${t.dl}: ${e.deadline}</span>`:""}</div><span class="free">${t.free}</span>${e.s=="open"||e.s=="soon"?`<a class="btn p" href="${esc(e.link||"#")}" target="_blank" rel="noopener">${t.reg}</a>`:`<span class="btn" style="opacity:.5">${t["s_"+e.s]}</span>`}</div>`).join(""):`<div class="empty">${t.none}</div>`;
+ $("#list").innerHTML=r.length?r.map(e=>`<div class="card ${e.s=="ended"?"dim":""}"><div class="row"><span class="tag">${t[e.type]}</span><span class="st ${e.s}">${t["s_"+e.s]}</span></div><h3>${esc(e.title[lang])}</h3><div class="meta"><span>📅 ${e.start}${e.end&&e.end!=e.start?" → "+e.end:""}</span><span>📍 ${CITY[lang][e.city]} · ${t[e.mode]}</span>${e.org?`<span>🏢 ${esc(e.org)}</span>`:""}${e.deadline?`<span>⏳ ${t.dl}: ${e.deadline}</span>`:""}</div><span class="free">${t.free}</span>${e.s=="open"||e.s=="soon"?`<a class="btn p" href="${esc(e.link||"#")}" target="_blank" rel="noopener">${t.reg}</a>`:`<span class="btn" style="opacity:.5">${t["s_"+e.s]}</span>`}</div>`).join(""):`<div class="empty">${t.none}</div>`;
  $("#s1").textContent=D.filter(e=>st(e)!="ended").length;
 }
 $("#lang").onclick=()=>{lang=lang=="ar"?"en":"ar";render()};
-$("#q").oninput=list;$("#past").onchange=list;$("#city").onchange=list;$("#mode").onchange=list;
+let T0=0;
+function formOpts(){const t=T[lang],o=(a,f)=>a.map(k=>`<option value="${k}">${f(k)}</option>`).join("");
+ $("#f_type").innerHTML=o(["ev","bc","ws","pg"],k=>t[k]);$("#f_city").innerHTML=o(Object.keys(CITY[lang]),k=>CITY[lang][k]);$("#f_mode").innerHTML=o(["onsite","online"],k=>t[k])}
+$("#openForm").onclick=()=>{formOpts();$("#sf").reset();$("#fmsg").textContent="";T0=Date.now();$("#dlg").showModal()};
+$("#fcancel").onclick=()=>$("#dlg").close();
+$("#sf").onsubmit=async e=>{e.preventDefault();const t=T[lang],b={t:T0};
+ ["type","title_ar","title_en","city","mode","start_date","end_date","deadline","org","link","contact","notes","website"].forEach(k=>b[k]=$("#f_"+k).value);
+ $("#fsend").disabled=true;
+ try{const r=await fetch("/api/submit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});
+  $("#fmsg").textContent=r.ok?t.sent:(r.status==429?t.limit:t.err);if(r.ok){$("#sf").reset();setTimeout(()=>$("#dlg").close(),2500)}}
+ catch{$("#fmsg").textContent=t.err}
+ $("#fsend").disabled=false};
+$("#types").onclick=e=>{const b=e.target.closest("button");if(b){type=b.dataset.k;render()}};$("#q").oninput=list;$("#past").onchange=list;$("#city").onchange=list;$("#mode").onchange=list;
 $("#theme").onclick=()=>{const r=document.documentElement,dark=getComputedStyle(r).getPropertyValue("--bg").trim()=="#050514";r.dataset.theme=dark?"light":"dark"};
 fetch("/api/events").then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{D=j;render()}).catch(()=>render());
 </script>
 </body>
 </html>
-

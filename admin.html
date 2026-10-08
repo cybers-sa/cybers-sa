@@ -33,6 +33,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 </div>
 <div class="r"><label><input type="checkbox" id="closed" style="width:auto"> التسجيل مغلق</label><label><input type="checkbox" id="published" style="width:auto" checked> منشورة</label></div>
 <div class="r"><button class="p" id="save">حفظ</button><button id="cancel">إلغاء</button><span id="m"></span></div></div>
+<div class="box" id="sb" style="display:none"><b>طلبات جديدة (<span id="sc">0</span>)</b><div id="sl"></div></div>
 <div class="box x"><table><thead><tr><th>العنوان</th><th>التاريخ</th><th>الحالة</th><th></th></tr></thead><tbody id="t"></tbody></table></div>
 </div>
 <script>
@@ -55,5 +56,10 @@ $('#t').onclick=async ev=>{const bt=ev.target.closest('button');if(!bt)return;co
  else if(a=='c'){await api('/api/admin/events/'+e.id,J('PUT',{...e,closed:!e.closed}));load()}
  else if(a=='p'){await api('/api/admin/events/'+e.id,J('PUT',{...e,published:!e.published}));load()}
  else if(a=='x'&&confirm('حذف هذه الفعالية نهائيًا؟')){await api('/api/admin/events/'+e.id,{method:'DELETE'});load()}}catch{msg('فشلت العملية')}};
-fill(null);load();
+const C={r:'الرياض',j:'جدة',d:'الدمام',k:'الخبر',m:'المدينة',o:'عن بُعد'},Tp={ev:'فعالية',bc:'معسكر',ws:'ورشة',pg:'برنامج'};let subs=[];
+async function loadSubs(){try{subs=await api('/api/admin/submissions');drawSubs()}catch{}}
+function drawSubs(){$('#sb').style.display=subs.length?'block':'none';$('#sc').textContent=subs.length;
+ $('#sl').innerHTML=subs.map(s=>`<div style="border-top:1px solid var(--line);padding:10px 0"><b>${esc(s.title_ar)}</b>${s.title_en?' · '+esc(s.title_en):''}<div style="color:var(--muted);font-size:13px">${esc(Tp[s.type]||'')} · ${esc(C[s.city]||'')} · ${esc(s.start_date)}${s.deadline?' · آخر موعد '+esc(s.deadline):''} · ${esc(s.org)}<br>الرابط: <a href="${esc(s.link)}" target="_blank" rel="noopener" style="color:var(--a)">${esc(s.link)}</a><br>التواصل: ${esc(s.contact)}${s.notes?'<br>ملاحظات: '+esc(s.notes):''}</div><div class="r"><button class="p" data-s="a" data-i="${s.id}">قبول ونشر</button><button class="d" data-s="r" data-i="${s.id}">رفض</button></div></div>`).join('')}
+$('#sl').onclick=async ev=>{const b=ev.target.closest('button');if(!b)return;try{if(b.dataset.s=='a')await api('/api/admin/submissions/'+b.dataset.i+'/approve',{method:'POST'});else if(confirm('رفض هذا الطلب؟'))await api('/api/admin/submissions/'+b.dataset.i,{method:'DELETE'});loadSubs();load()}catch{msg('فشلت العملية')}};
+fill(null);load();loadSubs();
 </script></body></html>
