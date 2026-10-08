@@ -2,20 +2,25 @@ const dec = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), 
 const txt = b => new TextDecoder().decode(b);
 
 // التحقق من توقيع Cloudflare Access (يرجع null إذا سُمح)
+// ملاحظة: رسائل السبب مؤقتة للتشخيص، ويمكن حذفها لاحقًا
 async function auth(request, env) {
+  const deny = r => new Response('Unauthorized: ' + r, { status: 401 });
+  if (!env.TEAM_DOMAIN || !env.POLICY_AUD) return deny('no-env');
   const t = request.headers.get('Cf-Access-Jwt-Assertion');
-  const deny = new Response('Unauthorized', { status: 401 });
-  if (!t || !env.TEAM_DOMAIN || !env.POLICY_AUD) return deny;
+  if (!t) return deny('no-token');
   try {
     const [h, p, s] = t.split('.');
     const head = JSON.parse(txt(dec(h)));
     const certs = await (await fetch(`https://${env.TEAM_DOMAIN}/cdn-cgi/access/certs`)).json();
     const jwk = certs.keys.find(k => k.kid === head.kid);
+    if (!jwk) return deny('no-key');
     const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
     const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, dec(s), new TextEncoder().encode(h + '.' + p));
+    if (!ok) return deny('bad-signature');
     const pl = JSON.parse(txt(dec(p)));
-    if (!ok || ![].concat(pl.aud).includes(env.POLICY_AUD) || pl.exp * 1000 < Date.now()) return deny;
-  } catch { return deny; }
+    if (![].concat(pl.aud).includes(env.POLICY_AUD)) return deny('bad-aud');
+    if (pl.exp * 1000 < Date.now()) return deny('expired');
+  } catch { return deny('team-domain-error'); }
   return null;
 }
 
