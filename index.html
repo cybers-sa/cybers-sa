@@ -4,12 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CYBERS_SA | دليل فعاليات الأمن السيبراني في السعودية</title>
-<meta name="description" content="دليل فعاليات ومعسكرات وورش الأمن السيبراني المجانية في السعودية | Free cyber security events, bootcamps and workshops in Saudi Arabia">
+<meta name="description" content="دليل فعاليات ومعسكرات وورش الأمن السيبراني المجانية في السعودية | Free cyber security events in Saudi Arabia">
 <link rel="canonical" href="https://cybers-sa.com/">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <link rel="apple-touch-icon" href="/logo.jpg">
 <meta name="theme-color" content="#050514">
-
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://cybers-sa.com/">
 <meta property="og:title" content="CYBERS_SA | دليل فعاليات الأمن السيبراني في السعودية">
@@ -76,6 +75,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
 .soc a:hover{border-color:var(--accent)}
 .soc svg{width:18px;height:18px;stroke:var(--text);fill:none;stroke-width:1.8}
 .note{font-size:12px;color:var(--muted);margin-top:8px}
+.dim{opacity:.55}.row{display:flex;justify-content:space-between;align-items:center;gap:8px}.st{font-size:12px;padding:3px 10px;border-radius:99px}.st.open{background:#35c48a22;color:#35c48a}.st.soon{background:#f5a52422;color:#f5a524}.st.closed,.st.ended{background:#8884;color:var(--muted)}.card .btn{align-self:flex-start}
 @media(max-width:700px){.links{display:none}}
 </style>
 </head>
@@ -97,7 +97,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
 <section id="events"><div class="wrap">
   <h2 data-i="n1"></h2>
   <div class="filters" id="types"></div>
-  <div class="filters"><select id="city"></select><select id="mode"></select></div>
+  <div class="filters"><select id="city"></select><select id="mode"></select><label style="font-size:14px;color:var(--muted);display:flex;gap:6px;align-items:center"><input type="checkbox" id="past"><span data-i="past"></span></label></div>
   <div class="grid" id="list"></div>
   <p class="note" data-i="demo"></p>
 </div></section>
@@ -133,16 +133,10 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
 
 <script>
 const T={
-ar:{n1:"الفعاليات",n2:"عن المنصة",n3:"خطتنا القادمة",n4:"أضف فعالية",h1:"كل فعاليات الأمن السيبراني المجانية في السعودية… في مكان واحد",h2:"معسكرات، ورش، برامج وفعاليات مجانية، نجمعها لك ونحدثها باستمرار.",ph:"ابحث عن فعالية أو معسكر…",browse:"تصفح",st1:"فعالية",st2:"مجاني",st3:"منطقة",all:"الكل",ev:"فعالية",bc:"معسكر",ws:"ورشة",pg:"برنامج",cityAll:"كل المدن",modeAll:"حضوري / عن بُعد",onsite:"حضوري",online:"عن بُعد",free:"مجاني",none:"لا توجد نتائج مطابقة.",demo:"* البيانات الحالية تجريبية لعرض التصميم، وتُستبدل ببيانات حقيقية.",a1t:"اكتشف",a1:"دليل واحد يجمع الفعاليات بدل التنقل بين الحسابات والمنصات.",a2t:"موثوق",a2:"نراجع كل فعالية قبل نشرها ونوضح الجهة المنظمة ورابط التسجيل.",a3t:"للجميع",a3:"موقع بالعربية والإنجليزية، مناسب للطلاب والمبتدئين والمحترفين.",c1:"عندك فعالية أو معسكر؟",c2:"أرسل التفاصيل وننشرها مجانًا لتصل للمجتمع التقني.",c3:"أرسل فعاليتك",road:["الآن: دليل الفعاليات مع البحث والتصنيف والمدن","قريبًا: تقويم وتنبيهات بالبريد وتيليجرام قبل الفعالية","ثم: نموذج تقديم فعاليات من المنظمين مع مراجعة","لاحقًا: حسابات ومفضلة وخريطة الفعاليات","مستقبلًا: دليل مصادر تعلم، وتحديات CTF، ومجتمع نقاش"],rights:"© 2026 CYBERS_SA. جميع الحقوق محفوظة."},
-en:{n1:"Events",n2:"About",n3:"Roadmap",n4:"Submit",h1:"Every free cyber security event in Saudi Arabia, in one place",h2:"Bootcamps, workshops, programs and events: collected and constantly updated.",ph:"Search events or bootcamps…",browse:"Browse",st1:"Events",st2:"Free",st3:"Regions",all:"All",ev:"Event",bc:"Bootcamp",ws:"Workshop",pg:"Program",cityAll:"All cities",modeAll:"Onsite / Online",onsite:"Onsite",online:"Online",free:"Free",none:"No matching results.",demo:"* Current data is placeholder to showcase the design.",a1t:"Discover",a1:"One directory instead of hopping between accounts and platforms.",a2t:"Trusted",a2:"Every listing is reviewed, with organizer and registration link shown.",a3t:"For everyone",a3:"Arabic and English, built for students, beginners and professionals.",c1:"Running an event or bootcamp?",c2:"Send the details and we'll list it for free to reach the community.",c3:"Submit your event",road:["Now: events directory with search, filters and cities","Soon: calendar plus email/Telegram reminders","Then: organizer submission form with review","Later: accounts, favorites and an events map","Future: learning resources, CTF challenges, community"],rights:"© 2026 CYBERS_SA. All rights reserved."}};
+ar:{n1:"الفعاليات",n2:"عن المنصة",n3:"خطتنا القادمة",n4:"أضف فعالية",h1:"كل فعاليات الأمن السيبراني المجانية في السعودية… في مكان واحد",h2:"معسكرات، ورش، برامج وفعاليات مجانية، نجمعها لك ونحدثها باستمرار.",ph:"ابحث عن فعالية أو معسكر…",browse:"تصفح",st1:"فعالية",st2:"مجاني",st3:"منطقة",all:"الكل",ev:"فعالية",bc:"معسكر",ws:"ورشة",pg:"برنامج",cityAll:"كل المدن",modeAll:"حضوري / عن بُعد",onsite:"حضوري",online:"عن بُعد",free:"مجاني",s_open:"التسجيل مفتوح",s_soon:"يغلق قريبًا",s_closed:"التسجيل مغلق",s_ended:"انتهت",dl:"آخر موعد",reg:"سجّل الآن",past:"إظهار الفعاليات المنتهية",none:"لا توجد نتائج مطابقة.",demo:"* البيانات الحالية تجريبية لعرض التصميم، وتُستبدل ببيانات حقيقية.",a1t:"اكتشف",a1:"دليل واحد يجمع الفعاليات بدل التنقل بين الحسابات والمنصات.",a2t:"موثوق",a2:"نراجع كل فعالية قبل نشرها ونوضح الجهة المنظمة ورابط التسجيل.",a3t:"للجميع",a3:"موقع بالعربية والإنجليزية، مناسب للطلاب والمبتدئين والمحترفين.",c1:"عندك فعالية أو معسكر؟",c2:"أرسل التفاصيل وننشرها مجانًا لتصل للمجتمع التقني.",c3:"أرسل فعاليتك",road:["الآن: دليل الفعاليات مع البحث والتصنيف والمدن","قريبًا: تقويم وتنبيهات بالبريد وتيليجرام قبل الفعالية","ثم: نموذج تقديم فعاليات من المنظمين مع مراجعة","لاحقًا: حسابات ومفضلة وخريطة الفعاليات","مستقبلًا: دليل مصادر تعلم، وتحديات CTF، ومجتمع نقاش"],rights:"© 2026 CYBERS_SA. جميع الحقوق محفوظة."},
+en:{n1:"Events",n2:"About",n3:"Roadmap",n4:"Submit",h1:"Every free cyber security event in Saudi Arabia, in one place",h2:"Bootcamps, workshops, programs and events: collected and constantly updated.",ph:"Search events or bootcamps…",browse:"Browse",st1:"Events",st2:"Free",st3:"Regions",all:"All",ev:"Event",bc:"Bootcamp",ws:"Workshop",pg:"Program",cityAll:"All cities",modeAll:"Onsite / Online",onsite:"Onsite",online:"Online",free:"Free",s_open:"Registration open",s_soon:"Closing soon",s_closed:"Registration closed",s_ended:"Ended",dl:"Deadline",reg:"Register now",past:"Show past events",none:"No matching results.",demo:"* Current data is placeholder to showcase the design.",a1t:"Discover",a1:"One directory instead of hopping between accounts and platforms.",a2t:"Trusted",a2:"Every listing is reviewed, with organizer and registration link shown.",a3t:"For everyone",a3:"Arabic and English, built for students, beginners and professionals.",c1:"Running an event or bootcamp?",c2:"Send the details and we'll list it for free to reach the community.",c3:"Submit your event",road:["Now: events directory with search, filters and cities","Soon: calendar plus email/Telegram reminders","Then: organizer submission form with review","Later: accounts, favorites and an events map","Future: learning resources, CTF challenges, community"],rights:"© 2026 CYBERS_SA. All rights reserved."}};
 const CITY={ar:{r:"الرياض",j:"جدة",d:"الدمام",k:"الخبر",m:"المدينة",o:"عن بُعد"},en:{r:"Riyadh",j:"Jeddah",d:"Dammam",k:"Khobar",m:"Madinah",o:"Remote"}};
-const D=[
-{t:"ev",ar:"مؤتمر أمن سيبراني (تجريبي)",en:"Cyber Security Conference (sample)",c:"r",m:"onsite",d:"2026-11-10",o:"Org A"},
-{t:"bc",ar:"معسكر مبتدئين في الأمن (تجريبي)",en:"Security Beginners Bootcamp (sample)",c:"j",m:"onsite",d:"2026-11-18",o:"Org B"},
-{t:"ws",ar:"ورشة اختبار اختراق الويب (تجريبي)",en:"Web Pentesting Workshop (sample)",c:"o",m:"online",d:"2026-11-22",o:"Org C"},
-{t:"pg",ar:"برنامج تدريب تعاوني (تجريبي)",en:"Cooperative Training Program (sample)",c:"d",m:"onsite",d:"2026-12-01",o:"Org D"},
-{t:"ws",ar:"ورشة تحليل البرمجيات الخبيثة (تجريبي)",en:"Malware Analysis Workshop (sample)",c:"k",m:"onsite",d:"2026-12-05",o:"Org E"},
-{t:"ev",ar:"مسابقة CTF (تجريبي)",en:"CTF Competition (sample)",c:"o",m:"online",d:"2026-12-12",o:"Org F"}];
+let D=[];
 let lang="ar",type="all";
 const $=s=>document.querySelector(s);
 function render(){
@@ -157,15 +151,19 @@ function render(){
  $("#mode").innerHTML=`<option value="">${t.modeAll}</option><option value="onsite" ${ms=="onsite"?"selected":""}>${t.onsite}</option><option value="online" ${ms=="online"?"selected":""}>${t.online}</option>`;
  list();
 }
+const DAY=864e5;
+function st(e){const n=new Date(new Date().toDateString()),en=new Date(e.end||e.start),dl=new Date(e.deadline||e.start);
+ if(en<n)return"ended";if(e.closed||dl<n)return"closed";if((dl-n)/DAY<=3)return"soon";return"open"}
 function list(){
- const t=T[lang],q=$("#q").value.toLowerCase(),c=$("#city").value,m=$("#mode").value;
- const r=D.filter(e=>(type=="all"||e.t==type)&&(!c||e.c==c)&&(!m||e.m==m)&&e[lang].toLowerCase().includes(q));
- $("#list").innerHTML=r.length?r.map(e=>`<div class="card"><span class="tag">${t[e.t]}</span><h3>${e[lang]}</h3><div class="meta"><span>📅 ${e.d}</span><span>📍 ${CITY[lang][e.c]} · ${t[e.m]}</span><span>🏢 ${e.o}</span></div><span class="free">${t.free}</span></div>`).join(""):`<div class="empty">${t.none}</div>`;
+ const t=T[lang],q=$("#q").value.toLowerCase(),c=$("#city").value,m=$("#mode").value,past=$("#past").checked;
+ const r=D.map(e=>({...e,s:st(e)})).filter(e=>(past||e.s!="ended")&&(type=="all"||e.type==type)&&(!c||e.city==c)&&(!m||e.mode==m)&&(e.title[lang]||"").toLowerCase().includes(q)).sort((a,b)=>a.start.localeCompare(b.start));
+ $("#list").innerHTML=r.length?r.map(e=>`<div class="card ${e.s=="ended"?"dim":""}"><div class="row"><span class="tag">${t[e.type]}</span><span class="st ${e.s}">${t["s_"+e.s]}</span></div><h3>${e.title[lang]}</h3><div class="meta"><span>📅 ${e.start}${e.end&&e.end!=e.start?" → "+e.end:""}</span><span>📍 ${CITY[lang][e.city]} · ${t[e.mode]}</span><span>🏢 ${e.org}</span>${e.deadline?`<span>⏳ ${t.dl}: ${e.deadline}</span>`:""}</div><span class="free">${t.free}</span>${e.s=="open"||e.s=="soon"?`<a class="btn p" href="${e.link||"#"}" target="_blank" rel="noopener">${t.reg}</a>`:`<span class="btn" style="opacity:.5">${t["s_"+e.s]}</span>`}</div>`).join(""):`<div class="empty">${t.none}</div>`;
+ $("#s1").textContent=D.filter(e=>st(e)!="ended").length;
 }
 $("#lang").onclick=()=>{lang=lang=="ar"?"en":"ar";render()};
-$("#q").oninput=list;$("#city").onchange=list;$("#mode").onchange=list;
+$("#q").oninput=list;$("#past").onchange=list;$("#city").onchange=list;$("#mode").onchange=list;
 $("#theme").onclick=()=>{const r=document.documentElement,dark=getComputedStyle(r).getPropertyValue("--bg").trim()=="#050514";r.dataset.theme=dark?"light":"dark"};
-render();
+fetch("events.json?v="+Date.now()).then(r=>r.json()).then(j=>{D=j;render()}).catch(()=>render());
 </script>
 </body>
 </html>

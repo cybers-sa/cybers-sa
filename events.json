@@ -1,0 +1,93 @@
+[
+  {
+    "id": 1,
+    "type": "ev",
+    "title": {
+      "ar": "مؤتمر أمن سيبراني (تجريبي)",
+      "en": "Cyber Security Conference (sample)"
+    },
+    "city": "r",
+    "mode": "onsite",
+    "start": "2026-11-10",
+    "end": "2026-11-11",
+    "deadline": "2026-11-05",
+    "org": "Org A",
+    "link": "https://example.com/register"
+  },
+  {
+    "id": 2,
+    "type": "bc",
+    "title": {
+      "ar": "معسكر مبتدئين في الأمن (تجريبي)",
+      "en": "Security Beginners Bootcamp (sample)"
+    },
+    "city": "j",
+    "mode": "onsite",
+    "start": "2026-11-18",
+    "end": "2026-11-22",
+    "deadline": "2026-11-12",
+    "org": "Org B",
+    "link": "https://example.com/register"
+  },
+  {
+    "id": 3,
+    "type": "ws",
+    "title": {
+      "ar": "ورشة اختبار اختراق الويب (تجريبي)",
+      "en": "Web Pentesting Workshop (sample)"
+    },
+    "city": "o",
+    "mode": "online",
+    "start": "2026-10-14",
+    "end": "2026-10-14",
+    "deadline": "2026-10-10",
+    "org": "Org C",
+    "link": "https://example.com/register"
+  },
+  {
+    "id": 4,
+    "type": "pg",
+    "title": {
+      "ar": "برنامج تدريب تعاوني (تجريبي)",
+      "en": "Cooperative Training Program (sample)"
+    },
+    "city": "d",
+    "mode": "onsite",
+    "start": "2026-12-01",
+    "end": "2027-02-01",
+    "deadline": "2026-11-20",
+    "org": "Org D",
+    "link": "https://example.com/register",
+    "closed": true
+  },
+  {
+    "id": 5,
+    "type": "ws",
+    "title": {
+      "ar": "ورشة تحليل البرمجيات الخبيثة (تجريبي)",
+      "en": "Malware Analysis Workshop (sample)"
+    },
+    "city": "k",
+    "mode": "onsite",
+    "start": "2026-09-20",
+    "end": "2026-09-20",
+    "deadline": "2026-09-15",
+    "org": "Org E",
+    "link": "https://example.com/register"
+  },
+  {
+    "id": 6,
+    "type": "ev",
+    "title": {
+      "ar": "مسابقة CTF (تجريبي)",
+      "en": "CTF Competition (sample)"
+    },
+    "city": "o",
+    "mode": "online",
+    "start": "2026-12-12",
+    "end": "2026-12-13",
+    "deadline": "2026-12-08",
+    "org": "Org F",
+    "link": "https://example.com/register"
+  }
+]
