@@ -99,7 +99,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
   <div class="filters" id="types"></div>
   <div class="filters"><select id="city"></select><select id="mode"></select><label style="font-size:14px;color:var(--muted);display:flex;gap:6px;align-items:center"><input type="checkbox" id="past"><span data-i="past"></span></label></div>
   <div class="grid" id="list"></div>
-  <p class="note" data-i="demo"></p>
+  
 </div></section>
 
 <section id="about"><div class="wrap">
@@ -151,19 +151,20 @@ function render(){
  $("#mode").innerHTML=`<option value="">${t.modeAll}</option><option value="onsite" ${ms=="onsite"?"selected":""}>${t.onsite}</option><option value="online" ${ms=="online"?"selected":""}>${t.online}</option>`;
  list();
 }
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const DAY=864e5;
 function st(e){const n=new Date(new Date().toDateString()),en=new Date(e.end||e.start),dl=new Date(e.deadline||e.start);
  if(en<n)return"ended";if(e.closed||dl<n)return"closed";if((dl-n)/DAY<=3)return"soon";return"open"}
 function list(){
  const t=T[lang],q=$("#q").value.toLowerCase(),c=$("#city").value,m=$("#mode").value,past=$("#past").checked;
  const r=D.map(e=>({...e,s:st(e)})).filter(e=>(past||e.s!="ended")&&(type=="all"||e.type==type)&&(!c||e.city==c)&&(!m||e.mode==m)&&(e.title[lang]||"").toLowerCase().includes(q)).sort((a,b)=>a.start.localeCompare(b.start));
- $("#list").innerHTML=r.length?r.map(e=>`<div class="card ${e.s=="ended"?"dim":""}"><div class="row"><span class="tag">${t[e.type]}</span><span class="st ${e.s}">${t["s_"+e.s]}</span></div><h3>${e.title[lang]}</h3><div class="meta"><span>📅 ${e.start}${e.end&&e.end!=e.start?" → "+e.end:""}</span><span>📍 ${CITY[lang][e.city]} · ${t[e.mode]}</span><span>🏢 ${e.org}</span>${e.deadline?`<span>⏳ ${t.dl}: ${e.deadline}</span>`:""}</div><span class="free">${t.free}</span>${e.s=="open"||e.s=="soon"?`<a class="btn p" href="${e.link||"#"}" target="_blank" rel="noopener">${t.reg}</a>`:`<span class="btn" style="opacity:.5">${t["s_"+e.s]}</span>`}</div>`).join(""):`<div class="empty">${t.none}</div>`;
+ $("#list").innerHTML=r.length?r.map(e=>`<div class="card ${e.s=="ended"?"dim":""}"><div class="row"><span class="tag">${t[e.type]}</span><span class="st ${e.s}">${t["s_"+e.s]}</span></div><h3>${esc(e.title[lang])}</h3><div class="meta"><span>📅 ${e.start}${e.end&&e.end!=e.start?" → "+e.end:""}</span><span>📍 ${CITY[lang][e.city]} · ${t[e.mode]}</span><span>🏢 ${esc(e.org)}</span>${e.deadline?`<span>⏳ ${t.dl}: ${e.deadline}</span>`:""}</div><span class="free">${t.free}</span>${e.s=="open"||e.s=="soon"?`<a class="btn p" href="${esc(e.link||"#")}" target="_blank" rel="noopener">${t.reg}</a>`:`<span class="btn" style="opacity:.5">${t["s_"+e.s]}</span>`}</div>`).join(""):`<div class="empty">${t.none}</div>`;
  $("#s1").textContent=D.filter(e=>st(e)!="ended").length;
 }
 $("#lang").onclick=()=>{lang=lang=="ar"?"en":"ar";render()};
 $("#q").oninput=list;$("#past").onchange=list;$("#city").onchange=list;$("#mode").onchange=list;
 $("#theme").onclick=()=>{const r=document.documentElement,dark=getComputedStyle(r).getPropertyValue("--bg").trim()=="#050514";r.dataset.theme=dark?"light":"dark"};
-fetch("events.json?v="+Date.now()).then(r=>r.json()).then(j=>{D=j;render()}).catch(()=>render());
+fetch("/api/events").then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{D=j;render()}).catch(()=>render());
 </script>
 </body>
 </html>
