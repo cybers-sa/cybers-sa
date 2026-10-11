@@ -20,12 +20,35 @@ async function auth(request, env) {
   return null;
 }
 
+// ---------- شعارات الجهات (تُخزَّن مرة واحدة لكل اسم جهة) ----------
+const ORG_SQL = "CREATE TABLE IF NOT EXISTS organizers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE COLLATE NOCASE, logo TEXT, updated INTEGER DEFAULT 0)";
+const LOGO = /^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+\/=]+$/;
+const logoOk = l => typeof l === 'string' && l.length <= 200000 && LOGO.test(l);
+async function saveLogo(db, name, logo) {
+  name = String(name || '').trim().slice(0, 200);
+  if (!name || !logo) return;
+  await db.prepare(ORG_SQL).run();
+  await db.prepare('INSERT INTO organizers(name,logo,updated) VALUES(?,?,?) ON CONFLICT(name) DO UPDATE SET logo=excluded.logo, updated=excluded.updated')
+    .bind(name, logo, Date.now()).run();
+}
+async function logoImg(env, id) {
+  try {
+    const r = await env.DB.prepare('SELECT logo FROM organizers WHERE id=?').bind(id).first();
+    const m = r && logoOk(r.logo) && r.logo.match(/^data:(image\/\w+);base64,(.*)$/);
+    if (!m) return new Response('Not found', { status: 404 });
+    const bin = Uint8Array.from(atob(m[2]), c => c.charCodeAt(0));
+    return new Response(bin, { headers: { 'Content-Type': m[1], 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' } });
+  } catch { return new Response('Not found', { status: 404 }); }
+}
+
 async function publicEvents(env) {
-  const r = await env.DB.prepare('SELECT * FROM events WHERE published=1').all();
+  await env.DB.prepare(ORG_SQL).run();
+  const r = await env.DB.prepare("SELECT e.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM events e LEFT JOIN organizers o ON o.name=e.org WHERE e.published=1").all();
   const out = r.results.map(e => ({
     id: e.id, type: e.type, title: { ar: e.title_ar, en: e.title_en || e.title_ar },
     city: e.city, mode: e.mode, start: e.start_date, end: e.end_date,
-    deadline: e.deadline, org: e.org, link: e.link, closed: !!e.closed
+    deadline: e.deadline, org: e.org, link: e.link, closed: !!e.closed,
+    logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
   }));
   return Response.json(out, { headers: { 'Cache-Control': 'public, max-age=60' } });
 }
@@ -42,15 +65,14 @@ async function admin(request, env, id) {
   const m = request.method, db = env.DB;
   try {
     if (m === 'GET') return j((await db.prepare('SELECT * FROM events ORDER BY start_date').all()).results);
-    if (m === 'POST') {
-      const v = clean(await request.json());
-      await db.prepare(`INSERT INTO events(${cols}) VALUES(${cols.map(() => '?')})`).bind(...v).run();
-      return j({ ok: 1 }, 201);
-    }
-    if (m === 'PUT' && id) {
-      const v = clean(await request.json());
-      await db.prepare(`UPDATE events SET ${cols.map(c => c + '=?')} WHERE id=?`).bind(...v, id).run();
-      return j({ ok: 1 });
+    if (m === 'POST' || (m === 'PUT' && id)) {
+      const b = await request.json();
+      if (b.org_logo && !logoOk(b.org_logo)) return j({ error: 'logo' }, 400);
+      const v = clean(b);
+      if (m === 'POST') await db.prepare(`INSERT INTO events(${cols}) VALUES(${cols.map(() => '?')})`).bind(...v).run();
+      else await db.prepare(`UPDATE events SET ${cols.map(c => c + '=?')} WHERE id=?`).bind(...v, id).run();
+      if (b.org_logo) await saveLogo(db, b.org, b.org_logo);
+      return j({ ok: 1 }, m === 'POST' ? 201 : 200);
     }
     if (m === 'DELETE' && id) { await db.prepare('DELETE FROM events WHERE id=?').bind(id).run(); return j({ ok: 1 }); }
   } catch { return j({ error: 'server' }, 500); }
@@ -58,6 +80,11 @@ async function admin(request, env, id) {
 }
 
 // ---------- طلبات "أرسل فعاليتك" ----------
+async function adminOrgs(env) {
+  await env.DB.prepare(ORG_SQL).run();
+  return j((await env.DB.prepare("SELECT id,name,updated,(logo IS NOT NULL AND logo!='') hl FROM organizers ORDER BY name").all()).results);
+}
+
 const SUB_SQL = "CREATE TABLE IF NOT EXISTS submissions (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title_ar TEXT, title_en TEXT, city TEXT, mode TEXT, start_date TEXT, end_date TEXT, deadline TEXT, org TEXT, link TEXT, contact TEXT, notes TEXT, ip_hash TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
 const TYPES = ['ev','bc','ws','pg'], CITIES = ['r','j','d','k','m','o'], MODES = ['onsite','online'];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -109,11 +136,13 @@ export default {
     const p = new URL(request.url).pathname, m = request.method;
     if (p === '/api/events' && m === 'GET') return publicEvents(env);
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
+    if (p.startsWith('/api/logo/') && m === 'GET') return logoImg(env, p.split('/')[3]);
     if (p.startsWith('/api/admin/')) {
       const deny = await auth(request, env);
       if (deny) return deny;
       const seg = p.split('/');
       if (seg[3] === 'events') return admin(request, env, seg[4]);
+      if (seg[3] === 'organizers') return adminOrgs(env);
       if (seg[3] === 'submissions') return adminSubs(request, env, seg.slice(4));
     }
     return env.ASSETS.fetch(request);
