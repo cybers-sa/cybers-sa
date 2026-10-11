@@ -9,7 +9,7 @@ h1{font-size:22px;display:flex;justify-content:space-between;align-items:center}
 .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
 .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 label{font-size:13px;color:var(--muted);display:block}
-input,select{width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit}
+input,select,textarea{width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit}
 button,.b{border:1px solid var(--line);background:var(--card);color:var(--text);padding:7px 12px;border-radius:8px;cursor:pointer;font:inherit;font-size:13px;text-decoration:none}
 .p{background:var(--a);border-color:var(--a);color:#fff}.d{color:#ff7b7b}
 .r{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
@@ -26,8 +26,10 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 <div><label>المدينة</label><select id="city"><option value="r">الرياض</option><option value="j">جدة</option><option value="d">الدمام</option><option value="k">الخبر</option><option value="m">المدينة</option><option value="o">عن بُعد</option></select></div>
 <div><label>الحضور</label><select id="mode"><option value="onsite">حضوري</option><option value="online">عن بُعد</option></select></div>
 <div><label>تاريخ البداية *</label><input type="date" id="start_date"></div>
-<div><label>تاريخ النهاية</label><input type="date" id="end_date"></div>
-<div><label>آخر موعد للتسجيل</label><input type="date" id="deadline"></div>
+<div><label>تاريخ النهاية (تختفي الفعالية تلقائيًا بعده)</label><input type="date" id="end_date"></div>
+<div><label>آخر موعد للتسجيل (يقفل التسجيل تلقائيًا بعده)</label><input type="date" id="deadline"></div>
+<div style="grid-column:1/-1"><label>الوصف (عربي): يظهر في "المزيد من المعلومات"</label><textarea id="desc_ar" rows="3" maxlength="1500"></textarea></div>
+<div style="grid-column:1/-1"><label>Description (English) اختياري</label><textarea id="desc_en" rows="3" maxlength="1500" dir="ltr"></textarea></div>
 <div><label>الجهة المنظمة</label><input id="org" list="orgs" autocomplete="off"><datalist id="orgs"></datalist></div>
 <div style="grid-column:1/-1;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><img id="org_prev" alt="" style="width:48px;height:48px;object-fit:contain;background:#fff;border-radius:10px;display:none"><div><label>شعار الجهة (اختياري): يُحفظ باسم الجهة ويُستخدم تلقائيًا في كل فعالياتها</label><input type="file" id="org_logo_file" accept="image/png,image/jpeg,image/webp"><small id="org_hint" style="color:var(--muted)"></small></div></div>
 <div><label>رابط التسجيل (https://...)</label><input id="link" dir="ltr"></div>
@@ -39,7 +41,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 </div>
 <script>
 const $=s=>document.querySelector(s);let rows=[],eid=null;
-const F=['type','title_ar','title_en','city','mode','start_date','end_date','deadline','org','link'];
+const F=['type','title_ar','title_en','desc_ar','desc_en','city','mode','start_date','end_date','deadline','org','link'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(u,o){const r=await fetch(u,o);if(!r.ok)throw 0;return r.json()}
 const J=(m,b)=>({method:m,headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});

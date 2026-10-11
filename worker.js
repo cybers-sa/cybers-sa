@@ -20,6 +20,17 @@ async function auth(request, env) {
   return null;
 }
 
+// إضافة أعمدة الوصف تلقائيًا للجدول القديم (مرة واحدة)
+let migrated = false;
+async function migrate(db) {
+  if (migrated) return;
+  const have = (await db.prepare('PRAGMA table_info(events)').all()).results.map(c => c.name);
+  for (const c of ['desc_ar', 'desc_en']) {
+    if (!have.includes(c)) { try { await db.prepare(`ALTER TABLE events ADD COLUMN ${c} TEXT DEFAULT ''`).run(); } catch {} }
+  }
+  migrated = true;
+}
+
 // ---------- شعارات الجهات (تُخزَّن مرة واحدة لكل اسم جهة) ----------
 const ORG_SQL = "CREATE TABLE IF NOT EXISTS organizers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE COLLATE NOCASE, logo TEXT, updated INTEGER DEFAULT 0)";
 const LOGO = /^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+\/=]+$/;
@@ -43,27 +54,30 @@ async function logoImg(env, id) {
 
 async function publicEvents(env) {
   await env.DB.prepare(ORG_SQL).run();
+  await migrate(env.DB);
   const r = await env.DB.prepare("SELECT e.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM events e LEFT JOIN organizers o ON o.name=e.org WHERE e.published=1").all();
   const out = r.results.map(e => ({
     id: e.id, type: e.type, title: { ar: e.title_ar, en: e.title_en || e.title_ar },
     city: e.city, mode: e.mode, start: e.start_date, end: e.end_date,
     deadline: e.deadline, org: e.org, link: e.link, closed: !!e.closed,
+    desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' },
     logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
   }));
   return Response.json(out, { headers: { 'Cache-Control': 'public, max-age=60' } });
 }
 
 // ---------- الفعاليات (للأدمن) ----------
-const cols = ['type','title_ar','title_en','city','mode','start_date','end_date','deadline','org','link','closed','published'];
+const cols = ['type','title_ar','title_en','desc_ar','desc_en','city','mode','start_date','end_date','deadline','org','link','closed','published'];
 const clean = b => cols.map(c => {
   if (c === 'closed' || c === 'published') return b[c] ? 1 : 0;
-  let v = String(b[c] ?? '').trim().slice(0, 300);
+  let v = String(b[c] ?? '').trim().slice(0, c.startsWith('desc_') ? 1500 : 300);
   if (c === 'link' && v && !/^https?:\/\//i.test(v)) v = '';
   return v;
 });
 async function admin(request, env, id) {
   const m = request.method, db = env.DB;
   try {
+    await migrate(db);
     if (m === 'GET') return j((await db.prepare('SELECT * FROM events ORDER BY start_date').all()).results);
     if (m === 'POST' || (m === 'PUT' && id)) {
       const b = await request.json();
@@ -117,6 +131,7 @@ async function adminSubs(request, env, parts) {
   const [id, act] = parts, m = request.method, db = env.DB;
   try {
     await db.prepare(SUB_SQL).run();
+    await migrate(db);
     if (m === 'GET') return j((await db.prepare("SELECT id,type,title_ar,title_en,city,mode,start_date,end_date,deadline,org,link,contact,notes,created_at FROM submissions WHERE status='pending' ORDER BY id DESC").all()).results);
     if (m === 'POST' && id && act === 'approve') {
       const s = await db.prepare("SELECT * FROM submissions WHERE id=? AND status='pending'").bind(id).first();
