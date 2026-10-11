@@ -35,8 +35,9 @@ async function migrate(db) {
 const ORG_SQL = "CREATE TABLE IF NOT EXISTS organizers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE COLLATE NOCASE, logo TEXT, updated INTEGER DEFAULT 0)";
 const LOGO = /^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+\/=]+$/;
 const logoOk = l => typeof l === 'string' && l.length <= 200000 && LOGO.test(l);
+const orgKey = n => String(n || '').split('|')[0].trim().slice(0, 200);
 async function saveLogo(db, name, logo) {
-  name = String(name || '').trim().slice(0, 200);
+  name = orgKey(name);
   if (!name || !logo) return;
   await db.prepare(ORG_SQL).run();
   await db.prepare('INSERT INTO organizers(name,logo,updated) VALUES(?,?,?) ON CONFLICT(name) DO UPDATE SET logo=excluded.logo, updated=excluded.updated')
@@ -55,7 +56,7 @@ async function logoImg(env, id) {
 async function publicEvents(env) {
   await env.DB.prepare(ORG_SQL).run();
   await migrate(env.DB);
-  const r = await env.DB.prepare("SELECT e.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM events e LEFT JOIN organizers o ON o.name=e.org WHERE e.published=1").all();
+  const r = await env.DB.prepare("SELECT e.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM events e LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(e.org,'|')>0 THEN substr(e.org,1,instr(e.org,'|')-1) ELSE e.org END) WHERE e.published=1").all();
   const out = r.results.map(e => ({
     id: e.id, type: e.type, title: { ar: e.title_ar, en: e.title_en || e.title_ar },
     city: e.city, mode: e.mode, start: e.start_date, end: e.end_date,
