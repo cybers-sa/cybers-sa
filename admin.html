@@ -20,12 +20,13 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 <h1>لوحة التحكم <a class="b" href="/">الموقع ↗</a></h1>
 <div class="box"><b id="ft">إضافة فعالية</b>
 <div class="g" style="margin-top:10px">
-<div><label>النوع</label><select id="type"><option value="ev">فعالية</option><option value="bc">معسكر</option><option value="ws">ورشة</option><option value="pg">برنامج</option></select></div>
+<div><label>النوع</label><select id="type"><option value="ev">فعالية</option><option value="bc">معسكر</option><option value="cr">دورة</option><option value="ws">ورشة</option><option value="pg">برنامج</option></select></div>
 <div><label>العنوان (عربي) *</label><input id="title_ar"></div>
 <div><label>العنوان (English): يظهر في الصفحة الإنجليزية، وإذا تركته فاضيًا يظهر العربي</label><input id="title_en"></div>
+<div><label>طريقة التقديم</label><select id="delivery"><option value="live">مباشر (له موعد بدء)</option><option value="self">ذاتي (بدون موعد بدء)</option></select></div>
 <div><label>المدينة</label><select id="city"><option value="r">الرياض</option><option value="j">جدة</option><option value="d">الدمام</option><option value="k">الخبر</option><option value="m">المدينة</option><option value="o">عن بُعد</option></select></div>
 <div><label>الحضور</label><select id="mode"><option value="onsite">حضوري</option><option value="online">عن بُعد</option></select></div>
-<div><label>تاريخ البداية *</label><input type="date" id="start_date"></div>
+<div id="w_start"><label>تاريخ البداية * (غير مطلوب للدورة الذاتية)</label><input type="date" id="start_date"></div>
 <div><label>تاريخ النهاية (تختفي الفعالية تلقائيًا بعده)</label><input type="date" id="end_date"></div>
 <div><label>آخر موعد للتسجيل (يقفل التسجيل تلقائيًا بعده)</label><input type="date" id="deadline"></div>
 <div style="grid-column:1/-1"><label>الوصف (عربي): يظهر في "المزيد من المعلومات"</label><textarea id="desc_ar" rows="3" maxlength="1500"></textarea></div>
@@ -41,17 +42,17 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 </div>
 <script>
 const $=s=>document.querySelector(s);let rows=[],eid=null;
-const F=['type','title_ar','title_en','desc_ar','desc_en','city','mode','start_date','end_date','deadline','org','link'];
+const F=['type','title_ar','title_en','desc_ar','desc_en','city','mode','delivery','start_date','end_date','deadline','org','link'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(u,o){const r=await fetch(u,o);if(!r.ok)throw 0;return r.json()}
 const J=(m,b)=>({method:m,headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
 const msg=t=>{$('#m').textContent=t;setTimeout(()=>$('#m').textContent='',3500)};
-function status(e){const t=new Date().toISOString().slice(0,10);if((e.end_date||e.start_date)<t)return['منتهية',0];if(e.closed||(e.deadline&&e.deadline<t))return['مغلق',0];return['مفتوح',1]}
-function draw(){$('#t').innerHTML=rows.map(e=>{const [s,o]=status(e);return`<tr><td>${esc(e.title_ar)}${e.published?'':' <small>(مخفية)</small>'}</td><td>${esc(e.start_date)}</td><td><span class="s ${o?'o':''}">${s}</span></td><td><button data-a="e" data-i="${e.id}">تعديل</button> <button data-a="c" data-i="${e.id}">${e.closed?'فتح التسجيل':'قفل التسجيل'}</button> <button data-a="p" data-i="${e.id}">${e.published?'إخفاء':'نشر'}</button> <button class="d" data-a="x" data-i="${e.id}">حذف</button></td></tr>`}).join('')||'<tr><td colspan=4>لا توجد فعاليات بعد.</td></tr>'}
+function status(e){const t=new Date().toISOString().slice(0,10);const last=e.end_date||e.start_date;if(last&&last<t)return['منتهية',0];if(e.closed||(e.deadline&&e.deadline<t))return['مغلق',0];return['مفتوح',1]}
+function draw(){$('#t').innerHTML=rows.map(e=>{const [s,o]=status(e);return`<tr><td>${esc(e.title_ar)}${e.published?'':' <small>(مخفية)</small>'}</td><td>${e.delivery=='self'?'ذاتي':esc(e.start_date)}</td><td><span class="s ${o?'o':''}">${s}</span></td><td><button data-a="e" data-i="${e.id}">تعديل</button> <button data-a="c" data-i="${e.id}">${e.closed?'فتح التسجيل':'قفل التسجيل'}</button> <button data-a="p" data-i="${e.id}">${e.published?'إخفاء':'نشر'}</button> <button class="d" data-a="x" data-i="${e.id}">حذف</button></td></tr>`}).join('')||'<tr><td colspan=4>لا توجد فعاليات بعد.</td></tr>'}
 async function load(){try{rows=await api('/api/admin/events');draw()}catch{msg('تعذر التحميل، تأكد من إعداد الحماية وقاعدة البيانات')}}
-function fill(e){F.forEach(k=>$('#'+k).value=e?e[k]||'':(k=='type'?'ev':k=='city'?'r':k=='mode'?'onsite':''));$('#closed').checked=!!(e&&e.closed);$('#published').checked=e?!!e.published:true;eid=e?e.id:null;$('#ft').textContent=e?'تعديل فعالية':'إضافة فعالية';$('#org_logo_file').value='';orgInfo()}
+function fill(e){F.forEach(k=>$('#'+k).value=e?e[k]||'':(k=='type'?'ev':k=='city'?'r':k=='mode'?'onsite':k=='delivery'?'live':''));$('#closed').checked=!!(e&&e.closed);$('#published').checked=e?!!e.published:true;eid=e?e.id:null;$('#ft').textContent=e?'تعديل فعالية':'إضافة فعالية';$('#org_logo_file').value='';orgInfo();togDel()}
 $('#save').onclick=async()=>{const b={};F.forEach(k=>b[k]=$('#'+k).value);b.closed=$('#closed').checked;b.published=$('#published').checked;
- if(!b.title_ar||!b.start_date)return msg('العنوان وتاريخ البداية مطلوبان');
+ if(!b.title_ar||(b.delivery!='self'&&!b.start_date))return msg('العنوان وتاريخ البداية مطلوبان (التاريخ غير مطلوب للدورة الذاتية)');
  const lf=$('#org_logo_file').files[0];if(lf){try{b.org_logo=await toDataUrl(lf)}catch{return msg('تعذر قراءة صورة الشعار')}}
  try{await api(eid?'/api/admin/events/'+eid:'/api/admin/events',J(eid?'PUT':'POST',b));fill(null);msg('تم الحفظ ✓');load();loadOrgs()}catch{msg('فشل الحفظ')}};
 $('#cancel').onclick=()=>fill(null);
@@ -60,11 +61,13 @@ $('#t').onclick=async ev=>{const bt=ev.target.closest('button');if(!bt)return;co
  else if(a=='c'){await api('/api/admin/events/'+e.id,J('PUT',{...e,closed:!e.closed}));load()}
  else if(a=='p'){await api('/api/admin/events/'+e.id,J('PUT',{...e,published:!e.published}));load()}
  else if(a=='x'&&confirm('حذف هذه الفعالية نهائيًا؟')){await api('/api/admin/events/'+e.id,{method:'DELETE'});load()}}catch{msg('فشلت العملية')}};
-const C={r:'الرياض',j:'جدة',d:'الدمام',k:'الخبر',m:'المدينة',o:'عن بُعد'},Tp={ev:'فعالية',bc:'معسكر',ws:'ورشة',pg:'برنامج'};let subs=[];
+const C={r:'الرياض',j:'جدة',d:'الدمام',k:'الخبر',m:'المدينة',o:'عن بُعد'},Tp={ev:'فعالية',bc:'معسكر',cr:'دورة',ws:'ورشة',pg:'برنامج'};let subs=[];
 async function loadSubs(){try{subs=await api('/api/admin/submissions');drawSubs()}catch{}}
 function drawSubs(){$('#sb').style.display=subs.length?'block':'none';$('#sc').textContent=subs.length;
- $('#sl').innerHTML=subs.map(s=>`<div style="border-top:1px solid var(--line);padding:10px 0"><b>${esc(s.title_ar)}</b>${s.title_en?' · '+esc(s.title_en):''}<div style="color:var(--muted);font-size:13px">${esc(Tp[s.type]||'')} · ${esc(C[s.city]||'')} · ${esc(s.start_date)}${s.deadline?' · آخر موعد '+esc(s.deadline):''} · ${esc(s.org)}<br>الرابط: <a href="${esc(s.link)}" target="_blank" rel="noopener" style="color:var(--a)">${esc(s.link)}</a><br>التواصل: ${esc(s.contact)}${s.notes?'<br>ملاحظات: '+esc(s.notes):''}</div><div class="r"><button class="p" data-s="a" data-i="${s.id}">قبول ونشر</button><button class="d" data-s="r" data-i="${s.id}">رفض</button></div></div>`).join('')}
+ $('#sl').innerHTML=subs.map(s=>`<div style="border-top:1px solid var(--line);padding:10px 0"><b>${esc(s.title_ar)}</b>${s.title_en?' · '+esc(s.title_en):''}<div style="color:var(--muted);font-size:13px">${esc(Tp[s.type]||'')} · ${esc(C[s.city]||'')} · ${s.delivery=='self'?'ذاتي':esc(s.start_date)}${s.deadline?' · آخر موعد '+esc(s.deadline):''} · ${esc(s.org)}<br>الرابط: <a href="${esc(s.link)}" target="_blank" rel="noopener" style="color:var(--a)">${esc(s.link)}</a><br>التواصل: ${esc(s.contact)}${s.notes?'<br>ملاحظات: '+esc(s.notes):''}</div><div class="r"><button class="p" data-s="a" data-i="${s.id}">قبول ونشر</button><button class="d" data-s="r" data-i="${s.id}">رفض</button></div></div>`).join('')}
 $('#sl').onclick=async ev=>{const b=ev.target.closest('button');if(!b)return;try{if(b.dataset.s=='a')await api('/api/admin/submissions/'+b.dataset.i+'/approve',{method:'POST'});else if(confirm('رفض هذا الطلب؟'))await api('/api/admin/submissions/'+b.dataset.i,{method:'DELETE'});loadSubs();load()}catch{msg('فشلت العملية')}};
+function togDel(){const s=$('#delivery').value=='self';$('#w_start').style.display=s?'none':'';if(s)$('#start_date').value=''}
+$('#delivery').onchange=()=>{if($('#delivery').value=='self'){$('#mode').value='online';$('#city').value='o'}togDel()};
 let orgs=[];
 async function loadOrgs(){try{orgs=await api('/api/admin/organizers');$('#orgs').innerHTML=orgs.map(o=>`<option value="${esc(o.name)}">`).join('');orgInfo()}catch{}}
 function orgInfo(){const n=$('#org').value.split('|')[0].trim().toLowerCase(),o=orgs.find(x=>x.name.toLowerCase()==n),p=$('#org_prev'),h=$('#org_hint');

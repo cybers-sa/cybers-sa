@@ -21,13 +21,16 @@ async function auth(request, env) {
 }
 
 // إضافة أعمدة الوصف تلقائيًا للجدول القديم (مرة واحدة)
-let migrated = false;
+async function addCols(db, table, map) {
+  const have = (await db.prepare(`PRAGMA table_info(${table})`).all()).results.map(c => c.name);
+  for (const [c, d] of Object.entries(map)) {
+    if (!have.includes(c)) { try { await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${c} TEXT DEFAULT '${d}'`).run(); } catch {} }
+  }
+}
+let migrated = false, subMig = false;
 async function migrate(db) {
   if (migrated) return;
-  const have = (await db.prepare('PRAGMA table_info(events)').all()).results.map(c => c.name);
-  for (const c of ['desc_ar', 'desc_en']) {
-    if (!have.includes(c)) { try { await db.prepare(`ALTER TABLE events ADD COLUMN ${c} TEXT DEFAULT ''`).run(); } catch {} }
-  }
+  await addCols(db, 'events', { desc_ar: '', desc_en: '', delivery: 'live' });
   migrated = true;
 }
 
@@ -59,7 +62,7 @@ async function publicEvents(env) {
   const r = await env.DB.prepare("SELECT e.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM events e LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(e.org,'|')>0 THEN substr(e.org,1,instr(e.org,'|')-1) ELSE e.org END) WHERE e.published=1").all();
   const out = r.results.map(e => ({
     id: e.id, type: e.type, title: { ar: e.title_ar, en: e.title_en || e.title_ar },
-    city: e.city, mode: e.mode, start: e.start_date, end: e.end_date,
+    city: e.city, mode: e.mode, delivery: e.delivery || 'live', start: e.start_date || '', end: e.end_date || '',
     deadline: e.deadline, org: e.org, link: e.link, closed: !!e.closed,
     desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' },
     logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
@@ -68,8 +71,9 @@ async function publicEvents(env) {
 }
 
 // ---------- الفعاليات (للأدمن) ----------
-const cols = ['type','title_ar','title_en','desc_ar','desc_en','city','mode','start_date','end_date','deadline','org','link','closed','published'];
+const cols = ['type','title_ar','title_en','desc_ar','desc_en','city','mode','delivery','start_date','end_date','deadline','org','link','closed','published'];
 const clean = b => cols.map(c => {
+  if (c === 'delivery') return b[c] === 'self' ? 'self' : 'live';
   if (c === 'closed' || c === 'published') return b[c] ? 1 : 0;
   let v = String(b[c] ?? '').trim().slice(0, c.startsWith('desc_') ? 1500 : 300);
   if (c === 'link' && v && !/^https?:\/\//i.test(v)) v = '';
@@ -100,9 +104,14 @@ async function adminOrgs(env) {
   return j((await env.DB.prepare("SELECT id,name,updated,(logo IS NOT NULL AND logo!='') hl FROM organizers ORDER BY name").all()).results);
 }
 
-const SUB_SQL = "CREATE TABLE IF NOT EXISTS submissions (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title_ar TEXT, title_en TEXT, city TEXT, mode TEXT, start_date TEXT, end_date TEXT, deadline TEXT, org TEXT, link TEXT, contact TEXT, notes TEXT, ip_hash TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
-const TYPES = ['ev','bc','ws','pg'], CITIES = ['r','j','d','k','m','o'], MODES = ['onsite','online'];
+const SUB_SQL = "CREATE TABLE IF NOT EXISTS submissions (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title_ar TEXT, title_en TEXT, city TEXT, mode TEXT, delivery TEXT DEFAULT 'live', start_date TEXT, end_date TEXT, deadline TEXT, org TEXT, link TEXT, contact TEXT, notes TEXT, ip_hash TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
+const TYPES = ['ev','bc','cr','ws','pg'], CITIES = ['r','j','d','k','m','o'], MODES = ['onsite','online'];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+async function ensureSub(db) {
+  await db.prepare(SUB_SQL).run();
+  if (!subMig) { await addCols(db, 'submissions', { delivery: 'live' }); subMig = true; }
+}
 
 async function submit(request, env) {
   if (Number(request.headers.get('content-length') || 0) > 10000) return j({ error: 'size' }, 413);
@@ -110,11 +119,11 @@ async function submit(request, env) {
   if (b.website) return j({ ok: 1 });                        // فخ للروبوتات
   if (Date.now() - Number(b.t || 0) < 3000) return j({ error: 'fast' }, 429);
   const v = k => String(b[k] ?? '').trim().slice(0, 300);
-  if (!v('title_ar') || !v('org') || !v('contact') || !DATE.test(v('start_date')) || !/^https?:\/\//i.test(v('link'))
+  if (!v('title_ar') || !v('org') || !v('contact') || (v('delivery') !== 'self' && !DATE.test(v('start_date'))) || (v('start_date') && !DATE.test(v('start_date'))) || !['live', 'self'].includes(v('delivery') || 'live') || !/^https?:\/\//i.test(v('link'))
     || !TYPES.includes(v('type')) || !CITIES.includes(v('city')) || !MODES.includes(v('mode'))
     || (v('end_date') && !DATE.test(v('end_date'))) || (v('deadline') && !DATE.test(v('deadline')))) return j({ error: 'invalid' }, 400);
   try {
-    await env.DB.prepare(SUB_SQL).run();
+    await ensureSub(env.DB);
     const ip = request.headers.get('CF-Connecting-IP') || '';
     const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip + (env.POLICY_AUD || ''))))]
       .map(x => x.toString(16).padStart(2, '0')).join('').slice(0, 32);
@@ -122,8 +131,8 @@ async function submit(request, env) {
     if (recent.c >= 3) return j({ error: 'limit' }, 429);
     const pend = await env.DB.prepare("SELECT COUNT(*) c FROM submissions WHERE status='pending'").first();
     if (pend.c >= 300) return j({ error: 'busy' }, 503);
-    await env.DB.prepare('INSERT INTO submissions(type,title_ar,title_en,city,mode,start_date,end_date,deadline,org,link,contact,notes,ip_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(v('type'), v('title_ar'), v('title_en'), v('city'), v('mode'), v('start_date'), v('end_date'), v('deadline'), v('org'), v('link'), v('contact'), v('notes'), h).run();
+    await env.DB.prepare('INSERT INTO submissions(type,title_ar,title_en,city,mode,delivery,start_date,end_date,deadline,org,link,contact,notes,ip_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(v('type'), v('title_ar'), v('title_en'), v('city'), v('mode'), v('delivery') === 'self' ? 'self' : 'live', v('start_date'), v('end_date'), v('deadline'), v('org'), v('link'), v('contact'), v('notes'), h).run();
     return j({ ok: 1 }, 201);
   } catch { return j({ error: 'server' }, 500); }
 }
@@ -131,14 +140,14 @@ async function submit(request, env) {
 async function adminSubs(request, env, parts) {
   const [id, act] = parts, m = request.method, db = env.DB;
   try {
-    await db.prepare(SUB_SQL).run();
+    await ensureSub(db);
     await migrate(db);
-    if (m === 'GET') return j((await db.prepare("SELECT id,type,title_ar,title_en,city,mode,start_date,end_date,deadline,org,link,contact,notes,created_at FROM submissions WHERE status='pending' ORDER BY id DESC").all()).results);
+    if (m === 'GET') return j((await db.prepare("SELECT id,type,title_ar,title_en,city,mode,delivery,start_date,end_date,deadline,org,link,contact,notes,created_at FROM submissions WHERE status='pending' ORDER BY id DESC").all()).results);
     if (m === 'POST' && id && act === 'approve') {
       const s = await db.prepare("SELECT * FROM submissions WHERE id=? AND status='pending'").bind(id).first();
       if (!s) return j({ error: 'not found' }, 404);
-      await db.prepare('INSERT INTO events(type,title_ar,title_en,city,mode,start_date,end_date,deadline,org,link,closed,published) VALUES(?,?,?,?,?,?,?,?,?,?,0,1)')
-        .bind(s.type, s.title_ar, s.title_en, s.city, s.mode, s.start_date, s.end_date, s.deadline, s.org, s.link).run();
+      await db.prepare('INSERT INTO events(type,title_ar,title_en,city,mode,delivery,start_date,end_date,deadline,org,link,closed,published) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,1)')
+        .bind(s.type, s.title_ar, s.title_en, s.city, s.mode, s.delivery || 'live', s.start_date, s.end_date, s.deadline, s.org, s.link).run();
       await db.prepare("UPDATE submissions SET status='approved' WHERE id=?").bind(id).run();
       return j({ ok: 1 });
     }
