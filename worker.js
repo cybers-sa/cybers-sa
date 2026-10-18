@@ -192,7 +192,7 @@ async function eventPage(request, env, id) {
 const JOB_SQL = "CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, title_ar TEXT, title_en TEXT, org TEXT, city TEXT, mode TEXT, kind TEXT, desc_ar TEXT, desc_en TEXT, questions TEXT DEFAULT '[]', deadline TEXT DEFAULT '', closed INTEGER DEFAULT 0, published INTEGER DEFAULT 1, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
 const APP_SQL = "CREATE TABLE IF NOT EXISTS applications (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, job_title TEXT, name TEXT, email TEXT, phone TEXT, linkedin TEXT, years REAL, answers TEXT DEFAULT '[]', cv_name TEXT, cv_type TEXT, cv_size INTEGER, status TEXT DEFAULT 'new', note TEXT DEFAULT '', ip_hash TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
 const CV_SQL = "CREATE TABLE IF NOT EXISTS cv_chunks (app_id INTEGER, n INTEGER, data TEXT, PRIMARY KEY(app_id, n))";
-const KINDS = ['full', 'part', 'intern', 'contract'], JMODES = ['onsite', 'online', 'hybrid'], ASTAT = ['new', 'good', 'maybe', 'no'];
+const KINDS = ['full', 'part', 'intern', 'contract'], JMODES = ['onsite', 'online'], ASTAT = ['new', 'good', 'maybe', 'no'];
 const MAXCV = 4 * 1024 * 1024, CH = 450000;
 let jobsReady = false;
 async function ensureJobs(db) {
@@ -209,7 +209,7 @@ async function publicJobs(env) {
   await ensureJobs(env.DB);
   const r = await env.DB.prepare("SELECT j.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM jobs j LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(j.org,'|')>0 THEN substr(j.org,1,instr(j.org,'|')-1) ELSE j.org END) WHERE j.published=1 AND (j.deadline IS NULL OR j.deadline='' OR j.deadline>=?) ORDER BY j.id DESC").bind(todayRiyadh()).all();
   return Response.json(r.results.map(e => ({
-    id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, mode: e.mode, kind: e.kind,
+    id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, mode: e.mode === 'online' ? 'online' : 'onsite', kind: e.kind,
     deadline: e.deadline || '', closed: !!e.closed, exp: e.exp || '', created: e.created_at || '', ref: 'CYB-' + String(e.created_at || '').slice(0, 4) + '-' + String(e.id).padStart(3, '0'), desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' }, q: jq(e.questions),
     logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
   })), { headers: { 'Cache-Control': 'no-store' } });
@@ -223,7 +223,7 @@ async function apply(request, env) {
   const v = (k, n = 200) => String(f.get(k) ?? '').trim().slice(0, n);
   const years = Number(v('years')), cv = f.get('cv');
   if (v('name').length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('email')) || !(years >= 0 && years <= 60) || v('years') === ''
-    || (v('phone') && !/^[0-9+\s()-]{6,20}$/.test(v('phone'))) || (v('linkedin') && !/^https?:\/\//i.test(v('linkedin')))
+    || !/^[0-9+\s()-]{6,20}$/.test(v('phone')) || (v('linkedin') && !/^https?:\/\//i.test(v('linkedin')))
     || !cv || typeof cv === 'string') return j({ error: 'invalid' }, 400);
   if (!cv.size || cv.size > MAXCV) return j({ error: 'file' }, 400);
   const buf = new Uint8Array(await cv.arrayBuffer());
