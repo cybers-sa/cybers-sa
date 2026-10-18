@@ -51,6 +51,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 <div><label>نوع الوظيفة</label><select id="j_kind"><option value="full">دوام كامل</option><option value="part">دوام جزئي</option><option value="intern">تدريب</option><option value="contract">عقد</option></select></div>
 <div><label>المدينة</label><select id="j_city"><option value="r">الرياض</option><option value="j">جدة</option><option value="d">الدمام</option><option value="k">الخبر</option><option value="m">المدينة</option><option value="o">عن بُعد</option></select></div>
 <div><label>الحضور</label><select id="j_mode"><option value="onsite">حضوري</option><option value="online">عن بُعد</option><option value="hybrid">هجين</option></select></div>
+<div><label>سنوات الخبرة المطلوبة (مثل 3-5)</label><input id="j_exp" dir="ltr" maxlength="20"></div>
 <div><label>آخر موعد للتقديم (تختفي الوظيفة بعده)</label><input type="date" id="j_deadline"></div>
 <div style="grid-column:1/-1"><label>وصف الوظيفة (عربي)</label><textarea id="j_desc_ar" rows="4" maxlength="3000"></textarea></div>
 <div style="grid-column:1/-1"><label>Description (English) اختياري</label><textarea id="j_desc_en" rows="3" maxlength="3000" dir="ltr"></textarea></div>
@@ -114,7 +115,7 @@ const jstat=j=>{const t=new Date().toISOString().slice(0,10);return j.deadline&&
 function jdraw(){$('#jt').innerHTML=jobs.map(j=>{const [s,o]=jstat(j);return`<tr><td>${esc(j.title_ar)}${j.published?'':' <small>(مخفية)</small>'}<br><small class="mut">${K[j.kind]||''}${j.deadline?' · حتى '+esc(j.deadline):''}</small></td><td>${j.n}</td><td><span class="s ${o?'o':''}">${s}</span></td><td><button data-a="e" data-i="${j.id}">تعديل</button> <button data-a="c" data-i="${j.id}">${j.closed?'فتح التقديم':'قفل التقديم'}</button> <button data-a="p" data-i="${j.id}">${j.published?'إخفاء':'نشر'}</button> <button class="d" data-a="x" data-i="${j.id}">حذف</button></td></tr>`}).join('')||'<tr><td colspan=4>لا توجد وظائف بعد.</td></tr>';
  const cur=$('#ap_job').value;$('#ap_job').innerHTML='<option value="">كل الوظائف</option>'+[...new Set(apps.map(a=>a.job_title))].map(t=>`<option ${t==cur?'selected':''}>${esc(t)}</option>`).join('')}
 async function jload(){try{jobs=await api('/api/admin/jobs');jdraw()}catch{jmsg('تعذر تحميل الوظائف')}}
-const JF=['title_ar','title_en','org','kind','city','mode','deadline','desc_ar','desc_en'];
+const JF=['title_ar','title_en','org','kind','city','mode','exp','deadline','desc_ar','desc_en'];
 function jfill(j){JF.forEach(k=>$('#j_'+k).value=j?j[k]||'':(k=='kind'?'full':k=='city'?'r':k=='mode'?'onsite':''));$('#j_q').value=j?j.questions.join('\n'):'';$('#j_closed').checked=!!(j&&j.closed);$('#j_published').checked=j?!!j.published:true;jid=j?j.id:null;$('#jft').textContent=j?'تعديل وظيفة':'إضافة وظيفة'}
 $('#jsave').onclick=async()=>{const b={};JF.forEach(k=>b[k]=$('#j_'+k).value);b.questions=$('#j_q').value.split('\n').map(x=>x.trim()).filter(Boolean);b.closed=$('#j_closed').checked;b.published=$('#j_published').checked;
  if(!b.title_ar.trim())return jmsg('المسمى الوظيفي مطلوب');if(b.questions.length>10)return jmsg('الحد الأقصى 10 أسئلة');
