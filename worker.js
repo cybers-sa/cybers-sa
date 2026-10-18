@@ -24,13 +24,21 @@ async function auth(request, env) {
 async function addCols(db, table, map) {
   const have = (await db.prepare(`PRAGMA table_info(${table})`).all()).results.map(c => c.name);
   for (const [c, d] of Object.entries(map)) {
-    if (!have.includes(c)) { try { await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${c} TEXT DEFAULT '${d}'`).run(); } catch {} }
+    const [ty, df] = Array.isArray(d) ? d : ['TEXT', d];
+    if (!have.includes(c)) { try { await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${c} ${ty} DEFAULT '${df}'`).run(); } catch {} }
   }
 }
 let migrated = false, subMig = false;
 async function migrate(db) {
   if (migrated) return;
-  await addCols(db, 'events', { desc_ar: '', desc_en: '', delivery: 'live' });
+  await addCols(db, 'events', { desc_ar: '', desc_en: '', delivery: 'live', show_ended: ['INTEGER', '0'] });
+  // مرة واحدة: القيمة القديمة self كانت تعني «ذاتية مستمرة» فتتحول إلى cont
+  await db.prepare('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)').run();
+  if (!(await db.prepare("SELECT v FROM meta WHERE k='delivery_v2'").first())) {
+    await db.prepare("UPDATE events SET delivery='cont' WHERE delivery='self'").run();
+    try { await db.prepare("UPDATE submissions SET delivery='cont' WHERE delivery='self'").run(); } catch {}
+    await db.prepare("INSERT INTO meta(k,v) VALUES('delivery_v2','1')").run();
+  }
   migrated = true;
 }
 
@@ -63,7 +71,7 @@ async function publicEvents(env) {
   const out = r.results.map(e => ({
     id: e.id, type: e.type, title: { ar: e.title_ar, en: e.title_en || e.title_ar },
     city: e.city, mode: e.mode, delivery: e.delivery || 'live', start: e.start_date || '', end: e.end_date || '',
-    deadline: e.deadline, org: e.org, link: e.link, closed: !!e.closed,
+    deadline: e.deadline, org: e.org, link: e.link, closed: !!e.closed, keep: Number(e.show_ended) === 1,
     desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' },
     logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
   }));
@@ -71,10 +79,10 @@ async function publicEvents(env) {
 }
 
 // ---------- الفعاليات (للأدمن) ----------
-const cols = ['type','title_ar','title_en','desc_ar','desc_en','city','mode','delivery','start_date','end_date','deadline','org','link','closed','published'];
+const cols = ['type','title_ar','title_en','desc_ar','desc_en','city','mode','delivery','start_date','end_date','deadline','org','link','closed','published','show_ended'];
 const clean = b => cols.map(c => {
-  if (c === 'delivery') return b[c] === 'self' ? 'self' : 'live';
-  if (c === 'closed' || c === 'published') return b[c] ? 1 : 0;
+  if (c === 'delivery') return ['self', 'cont'].includes(b[c]) ? b[c] : 'live';
+  if (c === 'closed' || c === 'published' || c === 'show_ended') return b[c] ? 1 : 0;
   let v = String(b[c] ?? '').trim().slice(0, c.startsWith('desc_') ? 1500 : 300);
   if (c === 'link' && v && !/^https?:\/\//i.test(v)) v = '';
   return v;
@@ -119,7 +127,8 @@ async function submit(request, env) {
   if (b.website) return j({ ok: 1 });                        // فخ للروبوتات
   if (Date.now() - Number(b.t || 0) < 3000) return j({ error: 'fast' }, 429);
   const v = k => String(b[k] ?? '').trim().slice(0, 300);
-  if (!v('title_ar') || !v('org') || !v('contact') || (v('delivery') !== 'self' && !DATE.test(v('start_date'))) || (v('start_date') && !DATE.test(v('start_date'))) || !['live', 'self'].includes(v('delivery') || 'live') || !/^https?:\/\//i.test(v('link'))
+  const dv = ['self', 'cont'].includes(v('delivery')) ? v('delivery') : 'live';
+  if (!v('title_ar') || !v('org') || !v('contact') || (dv === 'live' && !DATE.test(v('start_date'))) || (dv === 'self' && !DATE.test(v('end_date'))) || (v('start_date') && !DATE.test(v('start_date'))) || !/^https?:\/\//i.test(v('link'))
     || !TYPES.includes(v('type')) || !CITIES.includes(v('city')) || !MODES.includes(v('mode'))
     || (v('end_date') && !DATE.test(v('end_date'))) || (v('deadline') && !DATE.test(v('deadline')))) return j({ error: 'invalid' }, 400);
   try {
@@ -132,7 +141,7 @@ async function submit(request, env) {
     const pend = await env.DB.prepare("SELECT COUNT(*) c FROM submissions WHERE status='pending'").first();
     if (pend.c >= 300) return j({ error: 'busy' }, 503);
     await env.DB.prepare('INSERT INTO submissions(type,title_ar,title_en,city,mode,delivery,start_date,end_date,deadline,org,link,contact,notes,ip_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(v('type'), v('title_ar'), v('title_en'), v('city'), v('mode'), v('delivery') === 'self' ? 'self' : 'live', v('start_date'), v('end_date'), v('deadline'), v('org'), v('link'), v('contact'), v('notes'), h).run();
+      .bind(v('type'), v('title_ar'), v('title_en'), v('city'), v('mode'), dv, dv === 'live' ? v('start_date') : '', dv === 'cont' ? '' : v('end_date'), dv === 'cont' ? '' : v('deadline'), v('org'), v('link'), v('contact'), v('notes'), h).run();
     return j({ ok: 1 }, 201);
   } catch { return j({ error: 'server' }, 500); }
 }
