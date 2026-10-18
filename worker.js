@@ -188,12 +188,148 @@ async function eventPage(request, env, id) {
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' } });
 }
 
+// ---------- الوظائف وطلبات التقديم ----------
+const JOB_SQL = "CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, title_ar TEXT, title_en TEXT, org TEXT, city TEXT, mode TEXT, kind TEXT, desc_ar TEXT, desc_en TEXT, questions TEXT DEFAULT '[]', deadline TEXT DEFAULT '', closed INTEGER DEFAULT 0, published INTEGER DEFAULT 1, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
+const APP_SQL = "CREATE TABLE IF NOT EXISTS applications (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, job_title TEXT, name TEXT, email TEXT, phone TEXT, linkedin TEXT, years REAL, answers TEXT DEFAULT '[]', cv_name TEXT, cv_type TEXT, cv_size INTEGER, status TEXT DEFAULT 'new', note TEXT DEFAULT '', ip_hash TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
+const CV_SQL = "CREATE TABLE IF NOT EXISTS cv_chunks (app_id INTEGER, n INTEGER, data TEXT, PRIMARY KEY(app_id, n))";
+const KINDS = ['full', 'part', 'intern', 'contract'], JMODES = ['onsite', 'online', 'hybrid'], ASTAT = ['new', 'good', 'maybe', 'no'];
+const MAXCV = 4 * 1024 * 1024, CH = 450000;
+let jobsReady = false;
+async function ensureJobs(db) {
+  if (jobsReady) return;
+  for (const q of [JOB_SQL, APP_SQL, CV_SQL, ORG_SQL]) await db.prepare(q).run();
+  jobsReady = true;
+}
+const jq = s => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
+const b64 = u => { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+const todayRiyadh = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+
+async function publicJobs(env) {
+  await ensureJobs(env.DB);
+  const r = await env.DB.prepare("SELECT j.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM jobs j LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(j.org,'|')>0 THEN substr(j.org,1,instr(j.org,'|')-1) ELSE j.org END) WHERE j.published=1 AND (j.deadline IS NULL OR j.deadline='' OR j.deadline>=?) ORDER BY j.id DESC").bind(todayRiyadh()).all();
+  return Response.json(r.results.map(e => ({
+    id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, mode: e.mode, kind: e.kind,
+    deadline: e.deadline || '', closed: !!e.closed, desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' }, q: jq(e.questions),
+    logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
+  })), { headers: { 'Cache-Control': 'no-store' } });
+}
+
+async function apply(request, env) {
+  if (Number(request.headers.get('content-length') || 0) > MAXCV + 200000) return j({ error: 'size' }, 413);
+  let f; try { f = await request.formData(); } catch { return j({ error: 'bad' }, 400); }
+  if (f.get('website')) return j({ ok: 1 });                       // فخ للروبوتات
+  if (Date.now() - Number(f.get('t') || 0) < 4000) return j({ error: 'fast' }, 429);
+  const v = (k, n = 200) => String(f.get(k) ?? '').trim().slice(0, n);
+  const years = Number(v('years')), cv = f.get('cv');
+  if (v('name').length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('email')) || !(years >= 0 && years <= 60) || v('years') === ''
+    || (v('phone') && !/^[0-9+\s()-]{6,20}$/.test(v('phone'))) || (v('linkedin') && !/^https?:\/\//i.test(v('linkedin')))
+    || !cv || typeof cv === 'string') return j({ error: 'invalid' }, 400);
+  if (!cv.size || cv.size > MAXCV) return j({ error: 'file' }, 400);
+  const buf = new Uint8Array(await cv.arrayBuffer());
+  const sig = a => a.every((x, i) => buf[i] === x);
+  const ext = (String(cv.name).split('.').pop() || '').toLowerCase();
+  const ct = ext === 'pdf' && sig([0x25, 0x50, 0x44, 0x46]) ? 'application/pdf'
+    : ext === 'docx' && sig([0x50, 0x4b, 3, 4]) ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    : ext === 'doc' && sig([0xd0, 0xcf, 0x11, 0xe0]) ? 'application/msword' : '';
+  if (!ct) return j({ error: 'file' }, 400);
+  const db = env.DB;
+  try {
+    await ensureJobs(db);
+    const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND published=1').bind(v('job_id', 20)).first();
+    if (!job) return j({ error: 'nojob' }, 404);
+    if (job.closed || (job.deadline && job.deadline < todayRiyadh())) return j({ error: 'closed' }, 409);
+    const qs = jq(job.questions);
+    let ans; try { ans = JSON.parse(v('answers', 500) || '[]'); } catch { ans = null; }
+    if (!Array.isArray(ans) || ans.length !== qs.length || ans.some(a => a !== 'y' && a !== 'n')) return j({ error: 'invalid' }, 400);
+    if (await db.prepare('SELECT id FROM applications WHERE job_id=? AND lower(email)=lower(?)').bind(job.id, v('email')).first()) return j({ error: 'dup' }, 409);
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip + (env.POLICY_AUD || ''))))].map(x => x.toString(16).padStart(2, '0')).join('').slice(0, 32);
+    const recent = await db.prepare("SELECT COUNT(*) c FROM applications WHERE ip_hash=? AND created_at>datetime('now','-1 hour')").bind(h).first();
+    if (recent.c >= 5) return j({ error: 'limit' }, 429);
+    const cvName = String(cv.name).replace(/[\r\n]/g, ' ').slice(0, 120);
+    const r = await db.prepare('INSERT INTO applications(job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_type,cv_size,ip_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(job.id, job.title_ar, v('name', 100), v('email'), v('phone', 20), v('linkedin'), years, JSON.stringify(qs.map((q, i) => ({ q, a: ans[i] }))), cvName, ct, buf.length, h).run();
+    const id = r.meta.last_row_id;
+    try {
+      for (let i = 0, n = 0; i < buf.length; i += CH, n++)
+        await db.prepare('INSERT INTO cv_chunks(app_id,n,data) VALUES(?,?,?)').bind(id, n, b64(buf.subarray(i, i + CH))).run();
+    } catch {
+      await db.prepare('DELETE FROM cv_chunks WHERE app_id=?').bind(id).run();
+      await db.prepare('DELETE FROM applications WHERE id=?').bind(id).run();
+      return j({ error: 'server' }, 500);
+    }
+    return j({ ok: 1 }, 201);
+  } catch { return j({ error: 'server' }, 500); }
+}
+
+// ---------- الوظائف (للأدمن) ----------
+function jclean(b) {
+  const s = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n);
+  const qs = (Array.isArray(b.questions) ? b.questions : []).map(x => String(x).trim().slice(0, 250)).filter(Boolean).slice(0, 10);
+  return [s('title_ar'), s('title_en'), s('org'), CITIES.includes(b.city) ? b.city : 'r', JMODES.includes(b.mode) ? b.mode : 'onsite',
+    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0];
+}
+const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published'.split(',');
+async function adminJobs(request, env, id) {
+  const m = request.method, db = env.DB;
+  try {
+    await ensureJobs(db);
+    if (m === 'GET') return j((await db.prepare('SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id=j.id) n FROM jobs j ORDER BY j.id DESC').all()).results.map(r => ({ ...r, questions: jq(r.questions) })));
+    if (m === 'POST' || (m === 'PUT' && id)) {
+      const b = await request.json();
+      if (!String(b.title_ar || '').trim()) return j({ error: 'title' }, 400);
+      const v = jclean(b);
+      if (m === 'POST') await db.prepare(`INSERT INTO jobs(${JC}) VALUES(${JC.map(() => '?')})`).bind(...v).run();
+      else await db.prepare(`UPDATE jobs SET ${JC.map(c => c + '=?')} WHERE id=?`).bind(...v, id).run();
+      return j({ ok: 1 }, m === 'POST' ? 201 : 200);
+    }
+    if (m === 'DELETE' && id) { await db.prepare('DELETE FROM jobs WHERE id=?').bind(id).run(); return j({ ok: 1 }); }   // الطلبات والسير تبقى في البنك
+  } catch { return j({ error: 'server' }, 500); }
+  return j({ error: 'bad request' }, 400);
+}
+
+async function adminApps(request, env, id) {
+  const m = request.method, db = env.DB;
+  try {
+    await ensureJobs(db);
+    if (m === 'GET') return j((await db.prepare('SELECT id,job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_size,status,note,created_at FROM applications ORDER BY id DESC').all()).results.map(r => ({ ...r, answers: (() => { try { return JSON.parse(r.answers || '[]'); } catch { return []; } })() })));
+    if (m === 'PUT' && id) {
+      const b = await request.json();
+      if (!ASTAT.includes(b.status)) return j({ error: 'bad' }, 400);
+      await db.prepare('UPDATE applications SET status=?, note=? WHERE id=?').bind(b.status, String(b.note ?? '').slice(0, 500), id).run();
+      return j({ ok: 1 });
+    }
+    if (m === 'DELETE' && id) {
+      await db.prepare('DELETE FROM cv_chunks WHERE app_id=?').bind(id).run();
+      await db.prepare('DELETE FROM applications WHERE id=?').bind(id).run();
+      return j({ ok: 1 });
+    }
+  } catch { return j({ error: 'server' }, 500); }
+  return j({ error: 'bad request' }, 400);
+}
+
+async function adminCv(env, id) {
+  try {
+    await ensureJobs(env.DB);
+    const a = await env.DB.prepare('SELECT name,cv_name,cv_type FROM applications WHERE id=?').bind(id).first();
+    if (!a) return new Response('Not found', { status: 404 });
+    const rows = (await env.DB.prepare('SELECT data FROM cv_chunks WHERE app_id=? ORDER BY n').bind(id).all()).results;
+    const parts = rows.map(r => Uint8Array.from(atob(r.data), c => c.charCodeAt(0)));
+    const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
+    let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+    const ext = (a.cv_name.split('.').pop() || 'pdf').replace(/[^a-z]/gi, '');
+    return new Response(out, { headers: { 'Content-Type': a.cv_type, 'Content-Disposition': "attachment; filename*=UTF-8''" + encodeURIComponent(a.name + ' CV.' + ext), 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' } });
+  } catch { return new Response('Error', { status: 500 }); }
+}
+
 export default {
   async fetch(request, env) {
     const p = new URL(request.url).pathname, m = request.method;
     if (p === '/api/events' && m === 'GET') return publicEvents(env);
     if (m === 'GET' && /^\/e\/\d+$/.test(p)) return eventPage(request, env, p.split('/')[2]);
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
+    if (p === '/api/jobs' && m === 'GET') return publicJobs(env);
+    if (p === '/api/apply' && m === 'POST') return apply(request, env);
     if (p.startsWith('/api/logo/') && m === 'GET') return logoImg(env, p.split('/')[3]);
     if (p.startsWith('/api/admin/')) {
       const deny = await auth(request, env);
@@ -201,6 +337,9 @@ export default {
       const seg = p.split('/');
       if (seg[3] === 'events') return admin(request, env, seg[4]);
       if (seg[3] === 'organizers') return adminOrgs(env);
+      if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
+      if (seg[3] === 'apps') return adminApps(request, env, seg[4]);
+      if (seg[3] === 'cv' && seg[4]) return adminCv(env, seg[4]);
       if (seg[3] === 'submissions') return adminSubs(request, env, seg.slice(4));
     }
     return env.ASSETS.fetch(request);
