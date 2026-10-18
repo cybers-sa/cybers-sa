@@ -323,11 +323,34 @@ async function adminCv(env, id) {
   } catch { return new Response('Error', { status: 500 }); }
 }
 
+// صفحة رابط الوظيفة /j/ID
+async function jobPage(request, env, id) {
+  const url = new URL(request.url);
+  let html = await (await env.ASSETS.fetch(new Request(url.origin + '/'))).text();
+  try {
+    await ensureJobs(env.DB);
+    const e = await env.DB.prepare('SELECT * FROM jobs WHERE id=? AND published=1').bind(id).first();
+    if (e) {
+      const title = attr(e.title_ar + (e.title_en ? ' | ' + e.title_en : '') + ' | سايبرز');
+      const desc = attr((e.desc_ar || e.org || e.title_ar).replace(/\s+/g, ' ').slice(0, 160));
+      const page = attr(url.origin + '/j/' + e.id);
+      html = html.replace(/<title>.*?<\/title>/s, () => `<title>${title}</title>`)
+        .replace(/<meta name="description" content="[^"]*">/, () => `<meta name="description" content="${desc}">`)
+        .replace(/<meta property="og:title" content="[^"]*">/, () => `<meta property="og:title" content="${title}">`)
+        .replace(/<meta property="og:description" content="[^"]*">/, () => `<meta property="og:description" content="${desc}">`)
+        .replace(/<meta property="og:url" content="[^"]*">/, () => `<meta property="og:url" content="${page}">`)
+        .replace(/<link rel="canonical" href="[^"]*">/, () => `<link rel="canonical" href="${page}">`);
+    }
+  } catch {}
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' } });
+}
+
 export default {
   async fetch(request, env) {
     const p = new URL(request.url).pathname, m = request.method;
     if (p === '/api/events' && m === 'GET') return publicEvents(env);
     if (m === 'GET' && /^\/e\/\d+$/.test(p)) return eventPage(request, env, p.split('/')[2]);
+    if (m === 'GET' && /^\/j\/\d+$/.test(p)) return jobPage(request, env, p.split('/')[2]);
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
     if (p === '/api/jobs' && m === 'GET') return publicJobs(env);
     if (p === '/api/apply' && m === 'POST') return apply(request, env);
