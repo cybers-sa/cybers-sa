@@ -61,8 +61,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 <div class="r"><button class="p" id="jsave">حفظ</button><button id="jcancel">إلغاء</button><span id="jm" style="color:#ff7b7b"></span></div></div>
 <div class="box x"><table><thead><tr><th>الوظيفة</th><th>الطلبات</th><th>الحالة</th><th></th></tr></thead><tbody id="jt"></tbody></table></div>
 </div>
-<div id="v_ap" style="display:none"><div class="box"><div class="g"><div><label>الوظيفة</label><select id="ap_job"></select></div><div><label>التصنيف</label><select id="ap_st"><option value="">الكل</option><option value="new">جديد</option><option value="good">مرشّح</option><option value="maybe">احتياطي</option><option value="no">مرفوض</option></select></div></div><div id="apl"></div></div></div>
-<div id="v_bk" style="display:none"><div class="box"><div class="mut" style="margin-bottom:8px">كل السير الذاتية المحفوظة مصنفة حسب الوظيفة، وتبقى هنا حتى لو حُذفت الوظيفة.</div><div class="g"><div><label>بحث بالاسم أو البريد</label><input id="bk_q"></div><div><label>التصنيف</label><select id="bk_st"><option value="">الكل</option><option value="new">جديد</option><option value="good">مرشّح</option><option value="maybe">احتياطي</option><option value="no">مرفوض</option></select></div><div><label>أقل عدد سنوات خبرة</label><input id="bk_y" type="number" min="0" value="0"></div></div><div id="bkl" class="x"></div></div></div>
+<div id="v_ap" style="display:none"><div class="box"><div class="g"><div><label>الوظيفة</label><select id="ap_job"></select></div><div><label>التصنيف</label><select id="ap_st"><option value="">الكل</option><option value="new">جديد</option><option value="good">مرشّح</option><option value="maybe">احتياطي</option><option value="no">مرفوض</option></select></div></div><div class="r"><button class="p" id="zip_ap">⬇ تحميل المرشّحين (ZIP)</button><span class="mut" id="zip_m"></span></div><div id="apl"></div></div></div>
+<div id="v_bk" style="display:none"><div class="box"><div class="mut" style="margin-bottom:8px">كل السير الذاتية المحفوظة مصنفة حسب الوظيفة، وتبقى هنا حتى لو حُذفت الوظيفة.</div><div class="g"><div><label>بحث بالاسم أو البريد</label><input id="bk_q"></div><div><label>التصنيف</label><select id="bk_st"><option value="">الكل</option><option value="new">جديد</option><option value="good">مرشّح</option><option value="maybe">احتياطي</option><option value="no">مرفوض</option></select></div><div><label>أقل عدد سنوات خبرة</label><input id="bk_y" type="number" min="0" value="0"></div></div><div class="r"><button class="p" id="zip_bk">⬇ تحميل المعروض (ZIP)</button><span class="mut" id="zip_m2"></span></div><div id="bkl" class="x"></div></div></div>
 </div>
 <script>
 const $=s=>document.querySelector(s);let rows=[],eid=null;
@@ -137,9 +137,30 @@ $('#apl').onclick=async ev=>{const b=ev.target.closest('button');if(!b)return;tr
  if(b.dataset.s){const a=apps.find(x=>x.id==b.dataset.i);await api('/api/admin/apps/'+a.id,J('PUT',{status:b.dataset.s,note:a.note}));a.status=b.dataset.s;aload()}
  else if(b.dataset.x&&confirm('حذف الطلب والسيرة نهائيًا؟')){await api('/api/admin/apps/'+b.dataset.x,{method:'DELETE'});aload()}}catch{msg('فشلت العملية')}};
 $('#apl').onchange=async ev=>{const i=ev.target.dataset.n;if(!i)return;const a=apps.find(x=>x.id==i);try{await api('/api/admin/apps/'+i,J('PUT',{status:a.status,note:ev.target.value}));a.note=ev.target.value}catch{msg('فشل حفظ الملاحظة')}};
+let bl=[];
 function bdraw(){const q=$('#bk_q').value.toLowerCase(),st=$('#bk_st').value,y=+$('#bk_y').value||0,g={};
- apps.filter(a=>(!st||a.status==st)&&a.years>=y&&(a.name+' '+a.email).toLowerCase().includes(q)).forEach(a=>(g[a.job_title]=g[a.job_title]||[]).push(a));
+ bl=apps.filter(a=>(!st||a.status==st)&&a.years>=y&&(a.name+' '+a.email).toLowerCase().includes(q));bl.forEach(a=>(g[a.job_title]=g[a.job_title]||[]).push(a));
  $('#bkl').innerHTML=Object.keys(g).map(t=>`<h3 style="margin:16px 0 4px">${esc(t)} <small class="mut">(${g[t].length})</small></h3><table><tbody>${g[t].sort((a,b)=>b.years-a.years).map(a=>`<tr><td>${esc(a.name)}</td><td>${a.years} سنة</td><td><span class="st ${a.status}">${ST[a.status]}</span></td><td class="mut">${esc(a.email)}</td><td class="mut">${ago(a.created_at)}</td><td><a class="b" href="/api/admin/cv/${a.id}">تحميل</a></td></tr>`).join('')}</tbody></table>`).join('')||'<div class="mut">لا توجد سير محفوظة.</div>'}
+/* ---- تحميل السير كملف مضغوط ---- */
+const crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc=u=>{let c=-1;for(let i=0;i<u.length;i++)c=crcT[(c^u[i])&255]^(c>>>8);return(c^-1)>>>0};
+function mkzip(files){const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+ for(const f of files){const n=enc.encode(f.name),c=crc(f.data),L=f.data.length,h=new DataView(new ArrayBuffer(30));
+  h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x800,true);h.setUint16(12,0x21,true);h.setUint32(14,c,true);h.setUint32(18,L,true);h.setUint32(22,L,true);h.setUint16(26,n.length,true);
+  parts.push(h.buffer,n,f.data);
+  const g=new DataView(new ArrayBuffer(46));g.setUint32(0,0x02014b50,true);g.setUint16(4,20,true);g.setUint16(6,20,true);g.setUint16(8,0x800,true);g.setUint16(14,0x21,true);g.setUint32(16,c,true);g.setUint32(20,L,true);g.setUint32(24,L,true);g.setUint16(28,n.length,true);g.setUint32(42,off,true);
+  cen.push(g.buffer,n);off+=30+n.length+L}
+ const cs=cen.reduce((s,b)=>s+b.byteLength,0),e=new DataView(new ArrayBuffer(22));
+ e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+ return new Blob([...parts,...cen,e.buffer],{type:'application/zip'})}
+const safe=s=>String(s).replace(/[\\\/:*?"<>|\r\n]/g,'_').trim().slice(0,80)||'x';
+async function zipApps(list,label,out){if(!list.length){out.textContent='لا يوجد مرشحون في هذا العرض';return}
+ const files=[];try{for(let i=0;i<list.length;i++){const a=list[i];out.textContent=`جارٍ التحميل ${i+1} من ${list.length}…`;
+  const r=await fetch('/api/admin/cv/'+a.id);if(!r.ok)throw 0;files.push({name:safe(a.job_title)+'/'+safe(a.name)+' ('+a.years+' سنة) - '+a.id+'.'+(a.cv_name.split('.').pop().replace(/[^a-z]/gi,'')||'pdf'),data:new Uint8Array(await r.arrayBuffer())})}
+  const u=URL.createObjectURL(mkzip(files)),l=document.createElement('a');l.href=u;l.download=label+' '+new Date().toISOString().slice(0,10)+'.zip';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),6e4);out.textContent='تم تنزيل '+files.length+' سيرة ✓'}
+ catch{out.textContent='فشل التحميل'}}
+$('#zip_ap').onclick=()=>{const jb=$('#ap_job').value;zipApps(apps.filter(a=>a.status=='good'&&(!jb||a.job_title==jb)),'المرشحون'+(jb?' - '+safe(jb):''),$('#zip_m'))};
+$('#zip_bk').onclick=()=>zipApps(bl,'بنك السير',$('#zip_m2'));
 ['bk_q','bk_st','bk_y'].forEach(i=>$('#'+i).oninput=bdraw);
 fill(null);load();loadSubs();loadOrgs();jfill(null);aload().then(jload);
 </script></body></html>
