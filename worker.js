@@ -165,10 +165,34 @@ async function adminSubs(request, env, parts) {
   return j({ error: 'bad request' }, 400);
 }
 
+// صفحة رابط الفعالية /e/ID: نفس الموقع مع عنوان ومعاينة مشاركة خاصة بالفعالية
+const attr = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function eventPage(request, env, id) {
+  const url = new URL(request.url);
+  let html = await (await env.ASSETS.fetch(new Request(url.origin + '/'))).text();
+  try {
+    await migrate(env.DB);
+    const e = await env.DB.prepare('SELECT * FROM events WHERE id=? AND published=1').bind(id).first();
+    if (e) {
+      const title = attr(e.title_ar + (e.title_en ? ' | ' + e.title_en : '') + ' | سايبرز');
+      const desc = attr((e.desc_ar || [e.org, e.start_date].filter(Boolean).join(' · ') || e.title_ar).slice(0, 160));
+      const page = attr(url.origin + '/e/' + e.id);
+      html = html.replace(/<title>.*?<\/title>/s, () => `<title>${title}</title>`)
+        .replace(/<meta name="description" content="[^"]*">/, () => `<meta name="description" content="${desc}">`)
+        .replace(/<meta property="og:title" content="[^"]*">/, () => `<meta property="og:title" content="${title}">`)
+        .replace(/<meta property="og:description" content="[^"]*">/, () => `<meta property="og:description" content="${desc}">`)
+        .replace(/<meta property="og:url" content="[^"]*">/, () => `<meta property="og:url" content="${page}">`)
+        .replace(/<link rel="canonical" href="[^"]*">/, () => `<link rel="canonical" href="${page}">`);
+    }
+  } catch {}
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' } });
+}
+
 export default {
   async fetch(request, env) {
     const p = new URL(request.url).pathname, m = request.method;
     if (p === '/api/events' && m === 'GET') return publicEvents(env);
+    if (m === 'GET' && /^\/e\/\d+$/.test(p)) return eventPage(request, env, p.split('/')[2]);
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
     if (p.startsWith('/api/logo/') && m === 'GET') return logoImg(env, p.split('/')[3]);
     if (p.startsWith('/api/admin/')) {
