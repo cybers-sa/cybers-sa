@@ -300,6 +300,15 @@ async function adminApps(request, env, id) {
       await db.prepare('UPDATE applications SET status=?, note=? WHERE id=?').bind(b.status, String(b.note ?? '').slice(0, 500), id).run();
       return j({ ok: 1 });
     }
+    if (m === 'POST' && id === 'bulk') {       // حذف مجموعة طلبات وسيرها
+      const ids = ((await request.json()).ids || []).map(Number).filter(Number.isInteger).slice(0, 1000);
+      for (let i = 0; i < ids.length; i += 50) {
+        const part = ids.slice(i, i + 50), q = part.map(() => '?').join(',');
+        await db.prepare(`DELETE FROM cv_chunks WHERE app_id IN (${q})`).bind(...part).run();
+        await db.prepare(`DELETE FROM applications WHERE id IN (${q})`).bind(...part).run();
+      }
+      return j({ ok: 1, n: ids.length });
+    }
     if (m === 'DELETE' && id) {
       await db.prepare('DELETE FROM cv_chunks WHERE app_id=?').bind(id).run();
       await db.prepare('DELETE FROM applications WHERE id=?').bind(id).run();
@@ -309,7 +318,7 @@ async function adminApps(request, env, id) {
   return j({ error: 'bad request' }, 400);
 }
 
-async function adminCv(env, id) {
+async function adminCv(env, id, view) {
   try {
     await ensureJobs(env.DB);
     const a = await env.DB.prepare('SELECT name,cv_name,cv_type FROM applications WHERE id=?').bind(id).first();
@@ -319,7 +328,7 @@ async function adminCv(env, id) {
     const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
     let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
     const ext = (a.cv_name.split('.').pop() || 'pdf').replace(/[^a-z]/gi, '');
-    return new Response(out, { headers: { 'Content-Type': a.cv_type, 'Content-Disposition': "attachment; filename*=UTF-8''" + encodeURIComponent(a.name + ' CV.' + ext), 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' } });
+    return new Response(out, { headers: { 'Content-Type': a.cv_type, 'Content-Disposition': (view && a.cv_type === 'application/pdf' ? 'inline' : 'attachment') + "; filename*=UTF-8''" + encodeURIComponent(a.name + ' CV.' + ext), 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': 'sandbox', 'Cache-Control': 'no-store' } });
   } catch { return new Response('Error', { status: 500 }); }
 }
 
@@ -363,7 +372,7 @@ export default {
       if (seg[3] === 'organizers') return adminOrgs(env);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);
-      if (seg[3] === 'cv' && seg[4]) return adminCv(env, seg[4]);
+      if (seg[3] === 'cv' && seg[4]) return adminCv(env, seg[4], new URL(request.url).searchParams.get('view'));
       if (seg[3] === 'submissions') return adminSubs(request, env, seg.slice(4));
     }
     return env.ASSETS.fetch(request);

@@ -61,8 +61,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 <div class="r"><button class="p" id="jsave">حفظ</button><button id="jcancel">إلغاء</button><span id="jm" style="color:#ff7b7b"></span></div></div>
 <div class="box x"><table><thead><tr><th>الوظيفة</th><th>الطلبات</th><th>الحالة</th><th></th></tr></thead><tbody id="jt"></tbody></table></div>
 </div>
-<div id="v_ap" style="display:none"><div class="box"><div class="g"><div><label>الوظيفة</label><select id="ap_job"></select></div><div><label>التصنيف</label><select id="ap_st"><option value="">الكل</option><option value="new">جديد</option><option value="good">مرشّح</option><option value="maybe">احتياطي</option><option value="no">مرفوض</option></select></div></div><div class="r"><button class="p" id="zip_ap">⬇ تحميل المرشّحين (ZIP)</button><span class="mut" id="zip_m"></span></div><div id="apl"></div></div></div>
-<div id="v_bk" style="display:none"><div class="box"><div class="mut" style="margin-bottom:8px">كل السير الذاتية المحفوظة مصنفة حسب الوظيفة، وتبقى هنا حتى لو حُذفت الوظيفة.</div><div class="g"><div><label>بحث بالاسم أو البريد</label><input id="bk_q"></div><div><label>التصنيف</label><select id="bk_st"><option value="">الكل</option><option value="new">جديد</option><option value="good">مرشّح</option><option value="maybe">احتياطي</option><option value="no">مرفوض</option></select></div><div><label>أقل عدد سنوات خبرة</label><input id="bk_y" type="number" min="0" value="0"></div></div><div class="r"><button class="p" id="zip_bk">⬇ تحميل المعروض (ZIP)</button><span class="mut" id="zip_m2"></span></div><div id="bkl" class="x"></div></div></div>
+<div id="v_ap" style="display:none"><div class="box"><div class="g"><div><label>الوظيفة</label><select id="ap_job"></select></div><div><label>التصنيف</label><select id="ap_st"><option value="">الكل</option><option value="new">جديد</option><option value="good">مرشّح</option><option value="maybe">احتياطي</option><option value="no">مرفوض</option></select></div></div><div class="r"><button class="p" id="zip_ap">⬇ تحميل المرشّحين (ZIP)</button><button class="d" id="del_ap">🗑 حذف المعروض</button><span class="mut" id="zip_m"></span></div><div id="apl"></div></div></div>
+<div id="v_bk" style="display:none"><div class="box"><div class="mut" style="margin-bottom:8px">كل السير الذاتية المحفوظة مصنفة حسب الوظيفة، وتبقى هنا حتى لو حُذفت الوظيفة.</div><div class="g"><div><label>بحث بالاسم أو البريد</label><input id="bk_q"></div><div><label>التصنيف</label><select id="bk_st"><option value="">الكل</option><option value="new">جديد</option><option value="good">مرشّح</option><option value="maybe">احتياطي</option><option value="no">مرفوض</option></select></div><div><label>أقل عدد سنوات خبرة</label><input id="bk_y" type="number" min="0" value="0"></div></div><div class="r"><button class="p" id="zip_bk">⬇ تحميل المعروض (ZIP)</button><button class="d" id="del_bk">🗑 حذف المعروض</button><span class="mut" id="zip_m2"></span></div><div id="bkl" class="x"></div></div></div>
 </div>
 <script>
 const $=s=>document.querySelector(s);let rows=[],eid=null;
@@ -127,11 +127,12 @@ $('#jt').onclick=async ev=>{const bt=ev.target.closest('button');if(!bt)return;c
  else if(a=='p'){await api('/api/admin/jobs/'+j.id,J('PUT',{...j,published:!j.published}));jload()}
  else if(a=='x'&&confirm('حذف هذه الوظيفة؟ طلبات التقديم والسير عليها تبقى محفوظة في بنك السير.')){await api('/api/admin/jobs/'+j.id,{method:'DELETE'});jload()}}catch{jmsg('فشلت العملية')}};
 /* ---- الطلبات وبنك السير ---- */
+const isPdf=a=>/\.pdf$/i.test(a.cv_name);
 const ago=d=>esc(String(d||'').slice(0,10));
 async function aload(){try{apps=await api('/api/admin/apps');const n=apps.filter(a=>a.status=='new').length;$('#nnew').textContent=n?'('+n+')':'';adraw();bdraw();jdraw()}catch{}}
 function adraw(){const jb=$('#ap_job').value,st=$('#ap_st').value,r=apps.filter(a=>(!jb||a.job_title==jb)&&(!st||a.status==st));
  $('#apl').innerHTML=r.map(a=>`<div class="ap"><b>${esc(a.name)}</b> <span class="st ${a.status}">${ST[a.status]}</span><div class="mut" style="font-size:13px">${esc(a.job_title)} · خبرة ${a.years} سنة · ${ago(a.created_at)}<br><a href="mailto:${esc(a.email)}">${esc(a.email)}</a>${a.phone?' · <span dir="ltr">'+esc(a.phone)+'</span>':''}${/^https?:\/\//.test(a.linkedin)?' · <a href="'+esc(a.linkedin)+'" target="_blank" rel="noopener">لينكدإن</a>':''}</div>${a.answers.length?'<div style="font-size:13px;margin-top:6px">'+a.answers.map(x=>(x.a=='y'?'✅ ':'❌ ')+esc(String(x.q).split('|')[0].trim())).join('<br>')+'</div>':''}
- <div class="r sel"><a class="b p" href="/api/admin/cv/${a.id}">تحميل السيرة (${esc(a.cv_name.split('.').pop())})</a>${Object.keys(ST).map(k=>`<button class="${a.status==k?'on':''}" data-s="${k}" data-i="${a.id}">${ST[k]}</button>`).join('')}<input data-n="${a.id}" value="${esc(a.note)}" placeholder="ملاحظة" style="max-width:220px" maxlength="500"><button class="d" data-x="${a.id}">حذف</button></div></div>`).join('')||'<div class="mut">لا توجد طلبات.</div>'}
+ <div class="r sel">${isPdf(a)?`<a class="b" target="_blank" rel="noopener" href="/api/admin/cv/${a.id}?view=1">عرض السيرة</a>`:''}<a class="b p" href="/api/admin/cv/${a.id}">تحميل (${esc(a.cv_name.split('.').pop())})</a>${Object.keys(ST).map(k=>`<button class="${a.status==k?'on':''}" data-s="${k}" data-i="${a.id}">${ST[k]}</button>`).join('')}<input data-n="${a.id}" value="${esc(a.note)}" placeholder="ملاحظة" style="max-width:220px" maxlength="500"><button class="d" data-x="${a.id}">حذف</button></div></div>`).join('')||'<div class="mut">لا توجد طلبات.</div>'}
 $('#ap_job').onchange=adraw;$('#ap_st').onchange=adraw;
 $('#apl').onclick=async ev=>{const b=ev.target.closest('button');if(!b)return;try{
  if(b.dataset.s){const a=apps.find(x=>x.id==b.dataset.i);await api('/api/admin/apps/'+a.id,J('PUT',{status:b.dataset.s,note:a.note}));a.status=b.dataset.s;aload()}
@@ -140,7 +141,7 @@ $('#apl').onchange=async ev=>{const i=ev.target.dataset.n;if(!i)return;const a=a
 let bl=[];
 function bdraw(){const q=$('#bk_q').value.toLowerCase(),st=$('#bk_st').value,y=+$('#bk_y').value||0,g={};
  bl=apps.filter(a=>(!st||a.status==st)&&a.years>=y&&(a.name+' '+a.email).toLowerCase().includes(q));bl.forEach(a=>(g[a.job_title]=g[a.job_title]||[]).push(a));
- $('#bkl').innerHTML=Object.keys(g).map(t=>`<h3 style="margin:16px 0 4px">${esc(t)} <small class="mut">(${g[t].length})</small></h3><table><tbody>${g[t].sort((a,b)=>b.years-a.years).map(a=>`<tr><td>${esc(a.name)}</td><td>${a.years} سنة</td><td><span class="st ${a.status}">${ST[a.status]}</span></td><td class="mut">${esc(a.email)}</td><td class="mut">${ago(a.created_at)}</td><td><a class="b" href="/api/admin/cv/${a.id}">تحميل</a></td></tr>`).join('')}</tbody></table>`).join('')||'<div class="mut">لا توجد سير محفوظة.</div>'}
+ $('#bkl').innerHTML=Object.keys(g).map(t=>`<h3 style="margin:16px 0 4px">${esc(t)} <small class="mut">(${g[t].length})</small></h3><table><tbody>${g[t].sort((a,b)=>b.years-a.years).map(a=>`<tr><td>${esc(a.name)}</td><td>${a.years} سنة</td><td><span class="st ${a.status}">${ST[a.status]}</span></td><td class="mut">${esc(a.email)}</td><td class="mut">${ago(a.created_at)}</td><td>${isPdf(a)?`<a class="b" target="_blank" rel="noopener" href="/api/admin/cv/${a.id}?view=1">عرض</a> `:''}<a class="b" href="/api/admin/cv/${a.id}">تحميل</a></td></tr>`).join('')}</tbody></table>`).join('')||'<div class="mut">لا توجد سير محفوظة.</div>'}
 /* ---- تحميل السير كملف مضغوط ---- */
 const crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
 const crc=u=>{let c=-1;for(let i=0;i<u.length;i++)c=crcT[(c^u[i])&255]^(c>>>8);return(c^-1)>>>0};
@@ -160,6 +161,11 @@ async function zipApps(list,label,out){if(!list.length){out.textContent='لا ي
   const u=URL.createObjectURL(mkzip(files)),l=document.createElement('a');l.href=u;l.download=label+' '+new Date().toISOString().slice(0,10)+'.zip';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),6e4);out.textContent='تم تنزيل '+files.length+' سيرة ✓'}
  catch{out.textContent='فشل التحميل'}}
 $('#zip_ap').onclick=()=>{const jb=$('#ap_job').value;zipApps(apps.filter(a=>a.status=='good'&&(!jb||a.job_title==jb)),'المرشحون'+(jb?' - '+safe(jb):''),$('#zip_m'))};
+async function delApps(list,out){if(!list.length){out.textContent='لا يوجد شيء للحذف';return}
+ if(!confirm('سيتم حذف '+list.length+' طلب مع سيرهم الذاتية نهائيًا ولا يمكن التراجع. هل حمّلت نسخة ZIP قبل الحذف؟ متابعة الحذف؟'))return;
+ try{await api('/api/admin/apps/bulk',J('POST',{ids:list.map(a=>a.id)}));out.textContent='تم حذف '+list.length+' ✓';aload()}catch{out.textContent='فشل الحذف'}}
+$('#del_ap').onclick=()=>{const jb=$('#ap_job').value,st=$('#ap_st').value;delApps(apps.filter(a=>(!jb||a.job_title==jb)&&(!st||a.status==st)),$('#zip_m'))};
+$('#del_bk').onclick=()=>delApps(bl,$('#zip_m2'));
 $('#zip_bk').onclick=()=>zipApps(bl,'بنك السير',$('#zip_m2'));
 ['bk_q','bk_st','bk_y'].forEach(i=>$('#'+i).oninput=bdraw);
 fill(null);load();loadSubs();loadOrgs();jfill(null);aload().then(jload);
