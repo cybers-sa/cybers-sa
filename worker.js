@@ -129,6 +129,7 @@ async function submit(request, env) {
   if (Number(request.headers.get('content-length') || 0) > 10000) return j({ error: 'size' }, 413);
   let b; try { b = await request.json(); } catch { return j({ error: 'bad' }, 400); }
   if (b.website) return j({ ok: 1 });                        // فخ للروبوتات
+  if (!b.consent) return j({ error: 'consent' }, 400);
   if (Date.now() - Number(b.t || 0) < 3000) return j({ error: 'fast' }, 429);
   const v = k => String(b[k] ?? '').trim().slice(0, 300);
   const dv = ['self', 'cont'].includes(v('delivery')) ? v('delivery') : 'live';
@@ -223,6 +224,7 @@ async function apply(request, env) {
   if (Number(request.headers.get('content-length') || 0) > MAXCV + 200000) return j({ error: 'size' }, 413);
   let f; try { f = await request.formData(); } catch { return j({ error: 'bad' }, 400); }
   if (f.get('website')) return j({ ok: 1 });                       // فخ للروبوتات
+  if (f.get('consent') !== '1') return j({ error: 'consent' }, 400);
   if (Date.now() - Number(f.get('t') || 0) < 4000) return j({ error: 'fast' }, 429);
   const v = (k, n = 200) => String(f.get(k) ?? '').trim().slice(0, n);
   const years = Number(v('years')), cv = f.get('cv');
