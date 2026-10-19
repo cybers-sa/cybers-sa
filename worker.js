@@ -1,5 +1,6 @@
 const dec = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const txt = b => new TextDecoder().decode(b);
+const SEC = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'Strict-Transport-Security': 'max-age=31536000' };
 const j = (d, s = 200) => Response.json(d, { status: s });
 
 // التحقق من توقيع Cloudflare Access (يرجع null إذا سُمح)
@@ -31,7 +32,7 @@ async function addCols(db, table, map) {
 let migrated = false, subMig = false;
 async function migrate(db) {
   if (migrated) return;
-  await addCols(db, 'events', { desc_ar: '', desc_en: '', delivery: 'live', show_ended: ['INTEGER', '0'] });
+  await addCols(db, 'events', { desc_ar: '', desc_en: '', delivery: 'live', show_ended: ['INTEGER', '0'], place: '' });
   // مرة واحدة: القيمة القديمة self كانت تعني «ذاتية مستمرة» فتتحول إلى cont
   await db.prepare('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)').run();
   if (!(await db.prepare("SELECT v FROM meta WHERE k='delivery_v2'").first())) {
@@ -70,7 +71,7 @@ async function publicEvents(env) {
   const r = await env.DB.prepare("SELECT e.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM events e LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(e.org,'|')>0 THEN substr(e.org,1,instr(e.org,'|')-1) ELSE e.org END) WHERE e.published=1").all();
   const out = r.results.map(e => ({
     id: e.id, type: e.type, title: { ar: e.title_ar, en: e.title_en || e.title_ar },
-    city: e.city, mode: e.mode, delivery: e.delivery || 'live', start: e.start_date || '', end: e.end_date || '',
+    city: e.city, place: e.place || '', mode: e.mode, delivery: e.delivery || 'live', start: e.start_date || '', end: e.end_date || '',
     deadline: e.deadline, org: e.org, link: e.link, closed: !!e.closed, keep: Number(e.show_ended) === 1,
     desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' },
     logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
@@ -79,7 +80,9 @@ async function publicEvents(env) {
 }
 
 // ---------- الفعاليات (للأدمن) ----------
-const cols = ['type','title_ar','title_en','desc_ar','desc_en','city','mode','delivery','start_date','end_date','deadline','org','link','closed','published','show_ended'];
+const cols = ['type','title_ar','title_en','desc_ar','desc_en','city','mode','delivery','start_date','end_date','deadline','org','link','closed','published','show_ended','place'];
+const dOk = s => !s || (/^\d{4}-\d{2}-\d{2}$/.test(s) && +s.slice(0, 4) >= 2020 && +s.slice(0, 4) <= 2100);
+const datesBad = (a, b, c) => !dOk(a) || !dOk(b) || !dOk(c) || (a && b && b < a);
 const clean = b => cols.map(c => {
   if (c === 'delivery') return ['self', 'cont'].includes(b[c]) ? b[c] : 'live';
   if (c === 'closed' || c === 'published' || c === 'show_ended') return b[c] ? 1 : 0;
@@ -95,6 +98,7 @@ async function admin(request, env, id) {
     if (m === 'POST' || (m === 'PUT' && id)) {
       const b = await request.json();
       if (b.org_logo && !logoOk(b.org_logo)) return j({ error: 'logo' }, 400);
+      if (datesBad(String(b.start_date || '').trim(), String(b.end_date || '').trim(), String(b.deadline || '').trim())) return j({ error: 'dates' }, 400);
       const v = clean(b);
       if (m === 'POST') await db.prepare(`INSERT INTO events(${cols}) VALUES(${cols.map(() => '?')})`).bind(...v).run();
       else await db.prepare(`UPDATE events SET ${cols.map(c => c + '=?')} WHERE id=?`).bind(...v, id).run();
@@ -130,7 +134,7 @@ async function submit(request, env) {
   const dv = ['self', 'cont'].includes(v('delivery')) ? v('delivery') : 'live';
   if (!v('title_ar') || !v('org') || !v('contact') || (dv === 'live' && !DATE.test(v('start_date'))) || (dv === 'self' && !DATE.test(v('end_date'))) || (v('start_date') && !DATE.test(v('start_date'))) || !/^https?:\/\//i.test(v('link'))
     || !TYPES.includes(v('type')) || !CITIES.includes(v('city')) || !MODES.includes(v('mode'))
-    || (v('end_date') && !DATE.test(v('end_date'))) || (v('deadline') && !DATE.test(v('deadline')))) return j({ error: 'invalid' }, 400);
+    || (v('end_date') && !DATE.test(v('end_date'))) || (v('deadline') && !DATE.test(v('deadline'))) || datesBad(v('start_date'), v('end_date'), v('deadline'))) return j({ error: 'invalid' }, 400);
   try {
     await ensureSub(env.DB);
     const ip = request.headers.get('CF-Connecting-IP') || '';
@@ -185,7 +189,7 @@ async function eventPage(request, env, id) {
         .replace(/<link rel="canonical" href="[^"]*">/, () => `<link rel="canonical" href="${page}">`);
     }
   } catch {}
-  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' } });
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...SEC } });
 }
 
 // ---------- الوظائف وطلبات التقديم ----------
@@ -198,7 +202,7 @@ let jobsReady = false;
 async function ensureJobs(db) {
   if (jobsReady) return;
   for (const q of [JOB_SQL, APP_SQL, CV_SQL, ORG_SQL]) await db.prepare(q).run();
-  await addCols(db, 'jobs', { exp: '' });
+  await addCols(db, 'jobs', { exp: '', place: '' });
   jobsReady = true;
 }
 const jq = s => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
@@ -209,7 +213,7 @@ async function publicJobs(env) {
   await ensureJobs(env.DB);
   const r = await env.DB.prepare("SELECT j.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM jobs j LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(j.org,'|')>0 THEN substr(j.org,1,instr(j.org,'|')-1) ELSE j.org END) WHERE j.published=1 AND (j.deadline IS NULL OR j.deadline='' OR j.deadline>=?) ORDER BY j.id DESC").bind(todayRiyadh()).all();
   return Response.json(r.results.map(e => ({
-    id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, mode: e.mode === 'online' ? 'online' : 'onsite', kind: e.kind,
+    id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, place: e.place || '', mode: e.mode === 'online' ? 'online' : 'onsite', kind: e.kind,
     deadline: e.deadline || '', closed: !!e.closed, exp: e.exp || '', created: e.created_at || '', ref: 'CYB-' + String(e.created_at || '').slice(0, 4) + '-' + String(e.id).padStart(3, '0'), desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' }, q: jq(e.questions),
     logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
   })), { headers: { 'Cache-Control': 'no-store' } });
@@ -267,10 +271,10 @@ async function apply(request, env) {
 function jclean(b) {
   const s = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n);
   const qs = (Array.isArray(b.questions) ? b.questions : []).map(x => String(x).trim().slice(0, 250)).filter(Boolean).slice(0, 10);
-  return [s('title_ar'), s('title_en'), s('org'), CITIES.includes(b.city) ? b.city : 'r', JMODES.includes(b.mode) ? b.mode : 'onsite',
-    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20)];
+  return [s('title_ar'), s('title_en'), s('org'), CITIES.concat('x').includes(b.city) ? b.city : 'r', JMODES.includes(b.mode) ? b.mode : 'onsite',
+    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150)];
 }
-const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp'.split(',');
+const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place'.split(',');
 async function adminJobs(request, env, id) {
   const m = request.method, db = env.DB;
   try {
@@ -279,6 +283,7 @@ async function adminJobs(request, env, id) {
     if (m === 'POST' || (m === 'PUT' && id)) {
       const b = await request.json();
       if (!String(b.title_ar || '').trim()) return j({ error: 'title' }, 400);
+      if (!dOk(String(b.deadline || '').trim())) return j({ error: 'dates' }, 400);
       const v = jclean(b);
       if (m === 'POST') await db.prepare(`INSERT INTO jobs(${JC}) VALUES(${JC.map(() => '?')})`).bind(...v).run();
       else await db.prepare(`UPDATE jobs SET ${JC.map(c => c + '=?')} WHERE id=?`).bind(...v, id).run();
@@ -351,7 +356,7 @@ async function jobPage(request, env, id) {
         .replace(/<link rel="canonical" href="[^"]*">/, () => `<link rel="canonical" href="${page}">`);
     }
   } catch {}
-  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' } });
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...SEC } });
 }
 
 export default {
