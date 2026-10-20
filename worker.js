@@ -203,7 +203,7 @@ let jobsReady = false;
 async function ensureJobs(db) {
   if (jobsReady) return;
   for (const q of [JOB_SQL, APP_SQL, CV_SQL, ORG_SQL]) await db.prepare(q).run();
-  await addCols(db, 'jobs', { exp: '', place: '' });
+  await addCols(db, 'jobs', { exp: '', place: '', link: '' });
   jobsReady = true;
 }
 const jq = s => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
@@ -216,7 +216,7 @@ async function publicJobs(env) {
   return Response.json(r.results.map(e => ({
     id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, place: e.place || '', mode: e.mode === 'online' ? 'online' : 'onsite', kind: e.kind,
     deadline: e.deadline || '', closed: !!e.closed, exp: e.exp || '', created: e.created_at || '', ref: 'CYB-' + String(e.created_at || '').slice(0, 4) + '-' + String(e.id).padStart(3, '0'), desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' }, q: jq(e.questions),
-    logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
+    logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : '', link: /^https?:\/\//i.test(e.link || '') ? e.link : ''
   })), { headers: { 'Cache-Control': 'no-store' } });
 }
 
@@ -244,6 +244,7 @@ async function apply(request, env) {
     await ensureJobs(db);
     const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND published=1').bind(v('job_id', 20)).first();
     if (!job) return j({ error: 'nojob' }, 404);
+    if (job.link) return j({ error: 'external' }, 409);
     if (job.closed || (job.deadline && job.deadline < todayRiyadh())) return j({ error: 'closed' }, 409);
     const qs = jq(job.questions);
     let ans; try { ans = JSON.parse(v('answers', 500) || '[]'); } catch { ans = null; }
@@ -274,9 +275,9 @@ function jclean(b) {
   const s = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n);
   const qs = (Array.isArray(b.questions) ? b.questions : []).map(x => String(x).trim().slice(0, 250)).filter(Boolean).slice(0, 10);
   return [s('title_ar'), s('title_en'), s('org'), CITIES.concat('x').includes(b.city) ? b.city : 'r', JMODES.includes(b.mode) ? b.mode : 'onsite',
-    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150)];
+    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : ''];
 }
-const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place'.split(',');
+const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link'.split(',');
 async function adminJobs(request, env, id) {
   const m = request.method, db = env.DB;
   try {
@@ -286,9 +287,11 @@ async function adminJobs(request, env, id) {
       const b = await request.json();
       if (!String(b.title_ar || '').trim()) return j({ error: 'title' }, 400);
       if (!dOk(String(b.deadline || '').trim())) return j({ error: 'dates' }, 400);
+      if (b.org_logo && !logoOk(b.org_logo)) return j({ error: 'logo' }, 400);
       const v = jclean(b);
       if (m === 'POST') await db.prepare(`INSERT INTO jobs(${JC}) VALUES(${JC.map(() => '?')})`).bind(...v).run();
       else await db.prepare(`UPDATE jobs SET ${JC.map(c => c + '=?')} WHERE id=?`).bind(...v, id).run();
+      if (b.org_logo) await saveLogo(db, b.org, b.org_logo);
       return j({ ok: 1 }, m === 'POST' ? 201 : 200);
     }
     if (m === 'DELETE' && id) { await db.prepare('DELETE FROM jobs WHERE id=?').bind(id).run(); return j({ ok: 1 }); }   // الطلبات والسير تبقى في البنك
