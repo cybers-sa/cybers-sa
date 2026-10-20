@@ -15,10 +15,10 @@ button,.b{border:1px solid var(--line);background:var(--card);color:var(--text);
 .r{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
 table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;border-bottom:1px solid var(--line);text-align:start}
 .s{font-size:12px;padding:2px 9px;border-radius:99px;background:#8884}.s.o{background:#35c48a33;color:#35c48a}
-.x{overflow-x:auto}#m{color:#ff7b7b}.tb button.on{background:var(--a);border-color:var(--a);color:#fff}.st{font-size:12px;padding:2px 9px;border-radius:99px;background:#8884}.st.good{background:#35c48a33;color:#35c48a}.st.maybe{background:#f5a52433;color:#f5a524}.st.no{background:#ff7b7b33;color:#ff7b7b}.ap{border-top:1px solid var(--line);padding:12px 0}.ap small,.mut{color:var(--muted)}.ap a{color:var(--a)}.ap a.p{color:#fff}.sel button.on{border-color:var(--a)}.dot{width:24px;height:24px;border-radius:50%;padding:0;border:2px solid transparent;display:inline-block;vertical-align:middle}.dot.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--c)}i.dot{width:12px;height:12px;border:0}.cnt{display:inline-flex;gap:6px;align-items:center;font-size:15px;padding:6px 14px}.cnt.on{border-color:var(--a);background:#7b7bf022}.ap{border-inline-start:4px solid transparent;padding-inline-start:12px}.ap.new{border-inline-start-color:#7b8bd0}.ap.good{border-inline-start-color:#35c48a}.ap.maybe{border-inline-start-color:#f5a524}.ap.no{border-inline-start-color:#ff7b7b;opacity:.75}
+.x{overflow-x:auto}#m{color:#ff7b7b}.tb button.on{background:var(--a);border-color:var(--a);color:#fff}.st{font-size:12px;padding:2px 9px;border-radius:99px;background:#8884}.st.good{background:#35c48a33;color:#35c48a}.st.maybe{background:#f5a52433;color:#f5a524}.st.no{background:#ff7b7b33;color:#ff7b7b}.ap{border-top:1px solid var(--line);padding:12px 0}.ap small,.mut{color:var(--muted)}.ap a{color:var(--a)}.ap a.p{color:#fff}.sel button.on{border-color:var(--a)}#st_p button.on{background:var(--a);border-color:var(--a);color:#fff}.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}.kpi>div{border:1px solid var(--line);border-radius:12px;padding:12px}.kpi b{display:block;font-size:26px}.kpi span{color:var(--muted);font-size:13px}.bars{display:flex;align-items:flex-end;gap:2px;height:120px;margin:8px 0 18px}.bars i{flex:1;background:var(--a);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}.tl{border-top:1px solid var(--line);padding:6px 0;display:flex;justify-content:space-between;gap:10px;font-size:14px}.tg{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.dot{width:24px;height:24px;border-radius:50%;padding:0;border:2px solid transparent;display:inline-block;vertical-align:middle}.dot.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--c)}i.dot{width:12px;height:12px;border:0}.cnt{display:inline-flex;gap:6px;align-items:center;font-size:15px;padding:6px 14px}.cnt.on{border-color:var(--a);background:#7b7bf022}.ap{border-inline-start:4px solid transparent;padding-inline-start:12px}.ap.new{border-inline-start-color:#7b8bd0}.ap.good{border-inline-start-color:#35c48a}.ap.maybe{border-inline-start-color:#f5a524}.ap.no{border-inline-start-color:#ff7b7b;opacity:.75}
 </style></head><body><div class="w">
 <h1>لوحة التحكم <a class="b" href="/">الموقع ↗</a></h1>
-<div class="r tb" id="tabs" style="margin:0 0 14px"><button data-v="ev" class="on">الفعاليات</button><button data-v="sb">طلبات الفعاليات <span id="nsb"></span></button><button data-v="jb">الوظائف</button><button data-v="ap">المتقدمون <span id="nnew"></span></button><button data-v="bk">بنك السير</button></div>
+<div class="r tb" id="tabs" style="margin:0 0 14px"><button data-v="ev" class="on">الفعاليات</button><button data-v="sb">طلبات الفعاليات <span id="nsb"></span></button><button data-v="jb">الوظائف</button><button data-v="ap">المتقدمون <span id="nnew"></span></button><button data-v="bk">بنك السير</button><button data-v="st">الإحصائيات</button></div>
 <div id="v_ev">
 <div class="box"><b id="ft">إضافة فعالية</b>
 <div class="g" style="margin-top:10px">
@@ -77,6 +77,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 <div class="g" id="ap_qs" style="margin-top:10px"></div>
 <div class="r"><button class="p" id="zip_ap">⬇ تحميل المرشّحين (ZIP)</button><button class="d" id="del_ap">🗑 حذف المعروض</button><span class="mut" id="ap_shown"></span><span class="mut" id="zip_m"></span></div>
 <div id="apl"></div></div></div>
+<div id="v_st" style="display:none"><div class="box"><div class="r" style="margin:0 0 12px" id="st_p"><button data-d="7">7 أيام</button><button data-d="30" class="on">30 يومًا</button><button data-d="90">90 يومًا</button></div><div id="st_body" class="mut">جارٍ التحميل…</div></div></div>
 <div id="v_bk" style="display:none"><div class="box"><div class="mut" style="margin-bottom:8px">كل السير الذاتية المحفوظة مصنفة حسب الوظيفة، وتبقى هنا حتى لو حُذفت الوظيفة.</div><div class="g"><div><label>بحث بالاسم أو البريد</label><input id="bk_q"></div><div><label>التصنيف</label><select id="bk_st"><option value="">الكل</option><option value="new">جديد</option><option value="good">مرشّح</option><option value="maybe">احتياطي</option><option value="no">مرفوض</option></select></div><div><label>أقل عدد سنوات خبرة</label><input id="bk_y" type="number" min="0" value="0"></div></div><div class="r"><button class="p" id="zip_bk">⬇ تحميل المعروض (ZIP)</button><button class="d" id="del_bk">🗑 حذف المعروض</button><span class="mut" id="zip_m2"></span></div><div id="bkl" class="x"></div></div></div>
 </div>
 <script>
@@ -122,8 +123,8 @@ $('#org').oninput=orgInfo;
 function toDataUrl(f){return new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const m=256,r=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*r));c.height=Math.max(1,Math.round(im.height*r));c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/webp',0.85))};im.onerror=no;im.src=u})}
 
 /* ---- التبويبات ---- */
-function tab(v){['ev','sb','jb','ap','bk'].forEach(k=>$('#v_'+k).style.display=k==v?'':'none');document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v==v))}
-$('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.v)};
+function tab(v){['ev','sb','jb','ap','bk','st'].forEach(k=>$('#v_'+k).style.display=k==v?'':'none');document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v==v))}
+$('#tabs').onclick=e=>{const b=e.target.closest('button');if(b){tab(b.dataset.v);if(b.dataset.v=='st')sload()}};
 /* ---- الوظائف ---- */
 let jobs=[],jid=null,apps=[];
 const K={full:'دوام كامل',part:'دوام جزئي',intern:'تدريب',tte:'تدريب منتهي بالتوظيف',contract:'عقد'},ST={new:'جديد',good:'مرشّح',maybe:'احتياطي',no:'مرفوض'};
@@ -200,5 +201,14 @@ $('#del_ap').onclick=()=>delApps(apFiltered(false),$('#zip_m'));
 $('#del_bk').onclick=()=>delApps(bl,$('#zip_m2'));
 $('#zip_bk').onclick=()=>zipApps(bl,'بنك السير',$('#zip_m2'));
 ['bk_q','bk_st','bk_y'].forEach(i=>$('#'+i).oninput=bdraw);
+/* ---- الإحصائيات ---- */
+let sdays=30;
+async function sload(){try{sdraw(await api('/api/admin/stats?days='+sdays))}catch{$('#st_body').innerHTML='<div class="mut">تعذر تحميل الإحصائيات</div>'}}
+$('#st_p').onclick=e=>{const b=e.target.closest('button');if(!b)return;sdays=+b.dataset.d;document.querySelectorAll('#st_p button').forEach(x=>x.classList.toggle('on',x===b));sload()};
+function sdraw(d){const T=d.totals,k=x=>T[x]||0,mx=Math.max(1,...d.series.map(x=>x.v));
+ const cards=[['الزيارات',k('v')],['الزوار (مجموع الأيام)',k('u')],['فتح تفاصيل فعالية',k('ev')],['نقرات التسجيل',k('reg')],['مشاركة رابط',k('sh')],['عمليات بحث',k('s')],['فتح وظيفة',k('jo')],['بدء التقديم',k('ja')],['طلبات تقديم مكتملة',d.apps],['نقرات رابط وظيفة خارجي',k('jx')]];
+ const list=(t,a)=>`<div><b>${t}</b>${(a||[]).map(x=>`<div class="tl"><span>${esc(x.title)}</span><b>${x.n}</b></div>`).join('')||'<div class="mut">لا توجد بيانات بعد</div>'}</div>`;
+ $('#st_body').innerHTML=`<div class="kpi">${cards.map(c=>`<div><b>${c[1]}</b><span>${c[0]}</span></div>`).join('')}</div><b>الزيارات اليومية</b><div class="bars">${d.series.map(x=>`<i style="height:${Math.round(x.v/mx*100)}%" title="${x.day}: ${x.v} زيارة، ${x.u} زائر"></i>`).join('')}</div>
+ <div class="tg">${list('أكثر الفعاليات فتحًا',d.top.ev)}${list('أكثر الفعاليات نقرًا على التسجيل',d.top.reg)}${list('أكثر الوظائف فتحًا',d.top.jo)}${list('أكثر الوظائف بدء تقديم',d.top.ja)}${list('أكثر ما تمت مشاركته',d.top.sh)}${list('أكثر كلمات البحث',d.top.s)}</div>`}
 fill(null);load();loadSubs();loadOrgs();jfill(null);aload().then(jload);
 </script></body></html>

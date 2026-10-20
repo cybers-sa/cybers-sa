@@ -364,6 +364,67 @@ async function jobPage(request, env, id) {
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...SEC } });
 }
 
+// ---------- إحصائيات مجهولة (بدون كوكيز ولا بيانات شخصية) ----------
+const STAT_SQL = ["CREATE TABLE IF NOT EXISTS stats (day TEXT, kind TEXT, key TEXT, n INTEGER DEFAULT 0, PRIMARY KEY(day, kind, key))", "CREATE TABLE IF NOT EXISTS seen (day TEXT, h TEXT, PRIMARY KEY(day, h))"];
+let statsReady = false;
+async function ensureStats(db) { if (statsReady) return; for (const q of STAT_SQL) await db.prepare(q).run(); statsReady = true; }
+const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's'];
+const bump = (db, day, kind, key) => db.prepare('INSERT INTO stats(day,kind,key,n) VALUES(?,?,?,1) ON CONFLICT(day,kind,key) DO UPDATE SET n=n+1').bind(day, kind, key).run();
+async function track(request, env) {
+  const ok = () => new Response(null, { status: 204 });
+  if (Number(request.headers.get('content-length') || 0) > 400) return ok();
+  const ua = request.headers.get('user-agent') || '';
+  if (/bot|crawl|spider|slurp|preview|headless|monitor/i.test(ua)) return ok();
+  let b; try { b = await request.json(); } catch { return ok(); }
+  const k = String(b.k || ''); let key = String(b.key ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 60);
+  if (!SK.includes(k)) return ok();
+  if (['ev', 'reg', 'jo', 'ja', 'jx'].includes(k) && !/^\d{1,9}$/.test(key)) return ok();
+  if (k === 'sh' && !/^[ej]:\d{1,9}$/.test(key)) return ok();
+  if (k === 's') { key = key.toLowerCase(); if (key.length < 2) return ok(); }
+  if (k === 'v') key = '';
+  try {
+    const db = env.DB, day = todayRiyadh();
+    await ensureStats(db);
+    if (k === 's' && !(await db.prepare("SELECT 1 x FROM stats WHERE day=? AND kind='s' AND key=?").bind(day, key).first())) {
+      const c = await db.prepare("SELECT COUNT(*) c FROM stats WHERE day=? AND kind='s'").bind(day).first();
+      if (c.c >= 300) return ok();
+    }
+    await bump(db, day, k, key);
+    if (k === 'v') {                                     // زائر فريد لليوم: قيمة مشفّرة تتغير يوميًا
+      const ip = request.headers.get('CF-Connecting-IP') || '';
+      const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip + ua + day + (env.POLICY_AUD || ''))))].map(x => x.toString(16).padStart(2, '0')).join('').slice(0, 16);
+      const r = await db.prepare('INSERT OR IGNORE INTO seen(day,h) VALUES(?,?)').bind(day, h).run();
+      if (r.meta.changes === 1) await bump(db, day, 'u', '');
+      if (Math.random() < 0.02) await db.prepare('DELETE FROM seen WHERE day<?').bind(new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)).run();
+    }
+  } catch {}
+  return ok();
+}
+async function adminStats(request, env) {
+  const db = env.DB;
+  try {
+    await ensureStats(db); await ensureJobs(db); await migrate(db);
+    const days = Math.min(90, Math.max(1, Number(new URL(request.url).searchParams.get('days')) || 30));
+    const now = Date.now() + 3 * 3600e3, from = new Date(now - (days - 1) * 864e5).toISOString().slice(0, 10);
+    const rows = (await db.prepare('SELECT day,kind,key,n FROM stats WHERE day>=?').bind(from).all()).results;
+    const totals = {}, per = {}, tops = {};
+    for (const r of rows) {
+      totals[r.kind] = (totals[r.kind] || 0) + r.n;
+      if (r.kind === 'v' || r.kind === 'u') (per[r.day] = per[r.day] || {})[r.kind] = r.n;
+      else ((tops[r.kind] = tops[r.kind] || {})[r.key] = (tops[r.kind][r.key] || 0) + r.n);
+    }
+    const series = [];
+    for (let i = days - 1; i >= 0; i--) { const d = new Date(now - i * 864e5).toISOString().slice(0, 10); series.push({ day: d, v: (per[d] || {}).v || 0, u: (per[d] || {}).u || 0 }); }
+    const ev = Object.fromEntries((await db.prepare('SELECT id,title_ar FROM events').all()).results.map(r => [r.id, r.title_ar]));
+    const jb = Object.fromEntries((await db.prepare('SELECT id,title_ar FROM jobs').all()).results.map(r => [r.id, r.title_ar]));
+    const nm = (k, key) => k === 's' ? key : k === 'sh' ? ((key[0] === 'e' ? ev : jb)[key.slice(2)] || key) : (['jo', 'ja', 'jx'].includes(k) ? jb : ev)[key] || ('#' + key);
+    const top = {};
+    for (const k of Object.keys(tops)) top[k] = Object.entries(tops[k]).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([key, n]) => ({ key, n, title: nm(k, key) }));
+    const apps = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE substr(created_at,1,10)>=?').bind(from).first()).c;
+    return j({ days, series, totals, top, apps });
+  } catch { return j({ error: 'server' }, 500); }
+}
+
 export default {
   async fetch(request, env) {
     const p = new URL(request.url).pathname, m = request.method;
@@ -371,6 +432,7 @@ export default {
     if (m === 'GET' && /^\/e\/\d+$/.test(p)) return eventPage(request, env, p.split('/')[2]);
     if (m === 'GET' && /^\/j\/\d+$/.test(p)) return jobPage(request, env, p.split('/')[2]);
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
+    if (p === '/api/t' && m === 'POST') return track(request, env);
     if (p === '/api/jobs' && m === 'GET') return publicJobs(env);
     if (p === '/api/apply' && m === 'POST') return apply(request, env);
     if (p.startsWith('/api/logo/') && m === 'GET') return logoImg(env, p.split('/')[3]);
@@ -380,6 +442,7 @@ export default {
       const seg = p.split('/');
       if (seg[3] === 'events') return admin(request, env, seg[4]);
       if (seg[3] === 'organizers') return adminOrgs(env);
+      if (seg[3] === 'stats') return adminStats(request, env);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);
       if (seg[3] === 'cv' && seg[4]) return adminCv(env, seg[4], new URL(request.url).searchParams.get('view'));

@@ -245,8 +245,9 @@ $("#sf").onsubmit=async e=>{e.preventDefault();const t=T[lang],b={t:T0};
  catch{$("#fmsg").textContent=t.err}
  $("#fsend").disabled=false};
 const orgName=e=>{const p=String(e.org||"").split("|");return(p.length>1?(p[lang=="ar"?0:1]||p[0]):p[0]).trim()};
-async function copyEv(id,btn,p="e"){const u=location.origin+"/"+p+"/"+id,o=btn.innerHTML;try{await navigator.clipboard.writeText(u)}catch{prompt("",u);return}btn.textContent=btn.classList.contains("go")?"✓":T[lang].copied;setTimeout(()=>{btn.innerHTML=o},2000)}
-function openEv(id){const e=D.find(x=>x.id==id);if(!e)return;const t=T[lang],s=st(e),op=s=="open"||s=="soon",d=e.desc&&e.desc[lang];
+function track(k,key){try{const b=JSON.stringify({k,key:key==null?"":String(key)});if(!(navigator.sendBeacon&&navigator.sendBeacon("/api/t",new Blob([b],{type:"application/json"}))))fetch("/api/t",{method:"POST",body:b,keepalive:true,headers:{"Content-Type":"application/json"}})}catch{}}
+async function copyEv(id,btn,p="e"){const u=location.origin+"/"+p+"/"+id,o=btn.innerHTML;try{await navigator.clipboard.writeText(u)}catch{prompt("",u);return}track("sh",p+":"+id);btn.textContent=btn.classList.contains("go")?"✓":T[lang].copied;setTimeout(()=>{btn.innerHTML=o},2000)}
+function openEv(id){const e=D.find(x=>x.id==id);if(!e)return;track("ev",id);const t=T[lang],s=st(e),op=s=="open"||s=="soon",d=e.desc&&e.desc[lang];
  $("#evb").innerHTML=`<div class="row"><span class="tag">${t[e.type]}</span><span class="st ${s}">${t["s_"+s]}</span></div>${e.logo?`<div class="ol" style="margin-top:12px"><img src="${esc(e.logo)}" alt=""></div>`:""}<h2 style="margin:12px 0">${esc(e.title[lang])}</h2><div class="meta">${dateLine(e,t)}<span>📍 ${esc(loc(e))} · ${t[e.mode]}</span>${e.org?`<span>🏢 ${esc(orgName(e))}</span>`:""}${e.deadline?`<span>⏳ ${t.dl}: ${esc(e.deadline)}</span>`:""}</div>${d?`<p class="dsc">${esc(d)}</p>`:""}<div class="r" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px"><span class="free">${t.free}</span>${op?`<a class="btn p" href="${esc(e.link||"#")}" target="_blank" rel="noopener">${t.reg}</a>`:""}<button class="btn" id="evl">${t.copy}</button><button class="btn" id="evc">${t.close}</button></div>`;
  $("#evc").onclick=()=>$("#evd").close();
  $("#evl").onclick=()=>copyEv(e.id,$("#evl"));
@@ -254,7 +255,7 @@ function openEv(id){const e=D.find(x=>x.id==id);if(!e)return;const t=T[lang],s=s
  $("#evd").showModal()}
 $("#evd").addEventListener("close",()=>{if(location.pathname.startsWith("/e/"))history.replaceState(null,"","/")});
 addEventListener("popstate",()=>{const d=$("#evd");if(d.open&&!location.pathname.startsWith("/e/"))d.close();const k=$("#jd");if(k.open&&!location.pathname.startsWith("/j/"))k.close()});
-$("#list").onclick=e=>{if(e.target.closest("a"))return;const sb=e.target.closest("[data-sh]");if(sb){copyEv(sb.dataset.sh,sb);return}const c=e.target.closest(".card[data-id]");if(c)openEv(c.dataset.id)};
+$("#list").onclick=e=>{if(e.target.closest("a")){const c=e.target.closest(".card[data-id]");if(c&&e.target.closest("a.btn.p"))track("reg",c.dataset.id);return}const sb=e.target.closest("[data-sh]");if(sb){copyEv(sb.dataset.sh,sb);return}const c=e.target.closest(".card[data-id]");if(c)openEv(c.dataset.id)};
 $("#list").onkeydown=e=>{if(e.key=="Enter"){const c=e.target.closest(".card[data-id]");if(c)openEv(c.dataset.id)}};
 $("#evd").onclick=e=>{const r=$("#evd").getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$("#evd").close()};
 $("#types").onclick=e=>{const b=e.target.closest("button");if(b){type=b.dataset.k;render()}};$("#q").oninput=()=>view=="ev"?list():jlist();$("#city").onchange=list;$("#deliv").onchange=list;$("#mode").onchange=list;
@@ -280,14 +281,14 @@ $("#jkinds").onclick=e=>{const b=e.target.closest("button");if(b){kind=b.dataset
 $("#jcity").onchange=jlist;$("#jmode").onchange=jlist;
 $("#jlist").onclick=e=>{const sh=e.target.closest("[data-shj]");if(sh){e.stopPropagation();copyEv(sh.dataset.shj,sh,"j");return}const a=e.target.closest("[data-ap]");if(a){startApply(a.dataset.ap);return}const c=e.target.closest("[data-j]");if(c)openJob(c.dataset.j)};
 $("#jlist").onkeydown=e=>{if(e.key=="Enter"&&!e.target.closest("button")){const c=e.target.closest("[data-j]");if(c)openJob(c.dataset.j)}};
-function openJob(id){const j=JD.find(x=>x.id==id);if(!j)return;const t=T[lang],s=jst(j);
+function openJob(id){const j=JD.find(x=>x.id==id);if(!j)return;track("jo",id);const t=T[lang],s=jst(j);
  $("#jb").innerHTML=`<div class="row"><span class="tag">${t["k_"+j.kind]||""}</span><span class="st ${s}">${s=="closed"?t.s_closed:s=="soon"?t.s_soon:t.jopen}</span></div>${j.logo?`<div class="ol" style="margin-top:12px"><img src="${esc(j.logo)}" alt=""></div>`:""}<h2 style="margin:12px 0">${esc(j.title[lang])}</h2><div class="meta"><span>📍 ${esc(loc(j))} · ${t[j.mode]}</span>${j.org?`<span>🏢 ${esc(orgName(j))}</span>`:""}${j.deadline?`<span>⏳ ${t.dl}: ${esc(j.deadline)}</span>`:""}</div>${j.desc[lang]?`<p class="dsc">${esc(j.desc[lang])}</p>`:""}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">${s=="closed"?"":(j.link?`<a class="btn p" href="${esc(j.link)}" target="_blank" rel="noopener">${t.apply}</a>`:`<button class="btn p" id="jap">${t.apply}</button>`)}<button class="btn" id="jsh">🔗 ${t.copy}</button><button class="btn" id="jcl">${t.close}</button></div>`;
  $("#jsh").onclick=()=>copyEv(j.id,$("#jsh"),"j");if(location.pathname!="/j/"+j.id)history.pushState(null,"","/j/"+j.id);
  $("#jcl").onclick=()=>$("#jd").close();if($("#jap"))$("#jap").onclick=()=>startApply(id);if(!$("#jd").open)$("#jd").showModal()}
 $("#jd").addEventListener("close",()=>{if(location.pathname.startsWith("/j/"))history.replaceState(null,"","/#jobs")});
 const AP={job:null,step:1,d:{},file:null,t0:0};
 const prof=()=>{try{return JSON.parse(localStorage.getItem("cs_prof")||"{}")}catch{return{}}};
-function startApply(id){AP.job=JD.find(x=>x.id==id);AP.step=1;AP.d=prof();AP.file=null;AP.t0=Date.now();wiz();if(!$("#jd").open)$("#jd").showModal()}
+function startApply(id){track("ja",id);AP.job=JD.find(x=>x.id==id);AP.step=1;AP.d=prof();AP.file=null;AP.t0=Date.now();wiz();if(!$("#jd").open)$("#jd").showModal()}
 const asteps=()=>AP.job&&AP.job.q.length?3:2;
 function grab(){const g=i=>$("#"+i)?$("#"+i).value.trim():undefined,d=AP.d;
  if(AP.step==1){d.name=g("a_name");d.email=g("a_email");d.phone=g("a_phone");d.li=g("a_li");const jid=g("a_job");if(jid&&(!AP.job||AP.job.id!=jid))AP.job=JD.find(x=>x.id==jid)}
@@ -317,6 +318,10 @@ async function nextStep(){const t=T[lang],n=asteps();grab();const d=AP.d,bad=m=>
   if(r.ok){$("#jb").innerHTML=`<h2 style="margin:0 0 12px">${esc(AP.job.title[lang])}</h2><p class="jm ok" style="font-size:16px">${t.jsent}</p><button class="btn" id="a_x">${t.close}</button>`;$("#a_x").onclick=()=>$("#jd").close();return}
   const e=await r.json().catch(()=>({}));wiz(r.status==409?(e.error=="dup"?t.jdup:t.jclosed):r.status==429?t.limit:t.jerr)}
  catch{wiz(t.jerr)}}
+$("#evb").addEventListener("click",e=>{const m=location.pathname.match(/^\/e\/(\d+)/);if(m&&e.target.closest("a.btn.p"))track("reg",m[1])});
+$("#jd").addEventListener("click",e=>{const m=location.pathname.match(/^\/j\/(\d+)/);if(m&&e.target.closest("a.btn.p"))track("jx",m[1])});
+let qtm;$("#q").addEventListener("input",()=>{clearTimeout(qtm);qtm=setTimeout(()=>{const v=$("#q").value.trim().toLowerCase();if(v.length>=2)track("s",v)},1500)});
+track("v");
 fetch("/api/jobs").then(r=>r.ok?r.json():[]).then(j=>{JD=j;jrender();const m=location.pathname.match(/^\/j\/(\d+)/);if(m)openJob(m[1])}).catch(()=>{});
 fetch("/api/events").then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{D=j;render();const m=location.pathname.match(/^\/e\/(\d+)/);if(m)openEv(m[1])}).catch(()=>render());
 </script>
