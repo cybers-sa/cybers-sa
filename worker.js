@@ -432,7 +432,9 @@ async function adminStats(request, env) {
     const top = {};
     for (const k of Object.keys(tops)) top[k] = Object.entries(tops[k]).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([key, n]) => ({ key, n, title: nm(k, key) }));
     const apps = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE substr(created_at,1,10)>=?').bind(from).first()).c;
-    return j({ days, series, totals, top, apps });
+    const all = {}; for (const r of (await db.prepare("SELECT kind, SUM(n) n FROM stats WHERE kind IN ('v','u') GROUP BY kind").all()).results) all[r.kind] = r.n;
+    const first = (await db.prepare("SELECT MIN(day) d FROM stats").first()) || {};
+    return j({ days, series, totals, top, apps, all, since: first.d || '' });
   } catch { return j({ error: 'server' }, 500); }
 }
 
