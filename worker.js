@@ -197,7 +197,7 @@ async function eventPage(request, env, id) {
 const JOB_SQL = "CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, title_ar TEXT, title_en TEXT, org TEXT, city TEXT, mode TEXT, kind TEXT, desc_ar TEXT, desc_en TEXT, questions TEXT DEFAULT '[]', deadline TEXT DEFAULT '', closed INTEGER DEFAULT 0, published INTEGER DEFAULT 1, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
 const APP_SQL = "CREATE TABLE IF NOT EXISTS applications (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, job_title TEXT, name TEXT, email TEXT, phone TEXT, linkedin TEXT, years REAL, answers TEXT DEFAULT '[]', cv_name TEXT, cv_type TEXT, cv_size INTEGER, status TEXT DEFAULT 'new', note TEXT DEFAULT '', ip_hash TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
 const CV_SQL = "CREATE TABLE IF NOT EXISTS cv_chunks (app_id INTEGER, n INTEGER, data TEXT, PRIMARY KEY(app_id, n))";
-const KINDS = ['full', 'part', 'intern', 'contract'], JMODES = ['onsite', 'online'], ASTAT = ['new', 'good', 'maybe', 'no'];
+const KINDS = ['full', 'part', 'intern', 'tte', 'contract'], JMODES = ['onsite', 'online'], ASTAT = ['new', 'good', 'maybe', 'no'];
 const MAXCV = 4 * 1024 * 1024, CH = 450000;
 let jobsReady = false;
 async function ensureJobs(db) {
