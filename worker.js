@@ -133,7 +133,7 @@ async function submit(request, env) {
   if (Date.now() - Number(b.t || 0) < 3000) return j({ error: 'fast' }, 429);
   const v = k => String(b[k] ?? '').trim().slice(0, 300);
   const dv = ['self', 'cont'].includes(v('delivery')) ? v('delivery') : 'live';
-  if (!v('title_ar') || !v('org') || !v('contact') || (dv === 'live' && !DATE.test(v('start_date'))) || (dv === 'self' && !DATE.test(v('end_date'))) || (v('start_date') && !DATE.test(v('start_date'))) || !/^https?:\/\//i.test(v('link'))
+  if (!v('title_ar') || !v('org') || !v('contact') || (dv === 'live' && !DATE.test(v('start_date')) && !DATE.test(v('deadline'))) || (dv === 'self' && !DATE.test(v('end_date'))) || (v('start_date') && !DATE.test(v('start_date'))) || !/^https?:\/\//i.test(v('link'))
     || !TYPES.includes(v('type')) || !CITIES.includes(v('city')) || !MODES.includes(v('mode'))
     || (v('end_date') && !DATE.test(v('end_date'))) || (v('deadline') && !DATE.test(v('deadline'))) || datesBad(v('start_date'), v('end_date'), v('deadline'))) return j({ error: 'invalid' }, 400);
   try {

@@ -29,9 +29,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;b
 <div><label>المدينة</label><select id="city"><option value="r">الرياض</option><option value="j">جدة</option><option value="d">الدمام</option><option value="k">الخبر</option><option value="m">المدينة</option><option value="o">عن بُعد</option><option value="x">أخرى (اكتبها في خانة الموقع)</option></select></div>
 <div><label>الموقع (اختياري): الحي أو القاعة، أو المدينة إذا اخترت «أخرى»</label><input id="place" maxlength="150"></div>
 <div><label>الحضور</label><select id="mode"><option value="onsite">حضوري</option><option value="online">عن بُعد</option></select></div>
-<div id="w_start"><label>تاريخ البداية * (غير مطلوب للدورة الذاتية)</label><input type="date" id="start_date"></div>
+<div id="w_start"><label>تاريخ البداية (اختياري إذا حددت آخر موعد للتقديم)</label><input type="date" id="start_date"></div>
 <div id="w_end"><label>تاريخ النهاية (تختفي الفعالية تلقائيًا بعده)</label><input type="date" id="end_date"></div>
-<div id="w_dl"><label>آخر موعد للتسجيل (يقفل التسجيل تلقائيًا بعده)</label><input type="date" id="deadline"></div>
+<div id="w_dl"><label>آخر موعد للتقديم (يقفل التقديم تلقائيًا بعده)</label><input type="date" id="deadline"></div>
 <div style="grid-column:1/-1"><label>الوصف (عربي): يظهر في "المزيد من المعلومات"</label><textarea id="desc_ar" rows="3" maxlength="1500"></textarea></div>
 <div style="grid-column:1/-1"><label>Description (English) اختياري</label><textarea id="desc_en" rows="3" maxlength="1500" dir="ltr"></textarea></div>
 <div><label>الجهة المنظمة: للّغتين اكتب «عربي | English» مثل: طويق | Tuwaiq</label><input id="org" list="orgs" autocomplete="off"><datalist id="orgs"></datalist></div>
@@ -85,12 +85,12 @@ async function api(u,o){const r=await fetch(u,o);if(!r.ok)throw 0;return r.json(
 const J=(m,b)=>({method:m,headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
 const datesMsg=(a,b,c)=>{const bad=x=>x&&(+x.slice(0,4)<2020||+x.slice(0,4)>2100);return bad(a)||bad(b)||bad(c)?'السنة في التاريخ غير صحيحة (تحقق من الرقم)':(a&&b&&b<a?'تاريخ النهاية قبل تاريخ البداية':'')};
 const msg=t=>{$('#m').textContent=t;setTimeout(()=>$('#m').textContent='',3500)};
-function status(e){const t=new Date().toISOString().slice(0,10);const last=e.end_date||e.start_date;if(last&&last<t)return['منتهية',0];if(e.closed||(e.deadline&&e.deadline<t))return['مغلق',0];return['مفتوح',1]}
+function status(e){const t=new Date().toISOString().slice(0,10);const last=e.end_date||e.start_date||e.deadline;if(last&&last<t)return['منتهية',0];if(e.closed||(e.deadline&&e.deadline<t))return['مغلق',0];return['مفتوح',1]}
 function draw(){$('#t').innerHTML=rows.map(e=>{const [s,o]=status(e);const wr=datesMsg(e.start_date,e.end_date,e.deadline);return`<tr><td>${esc(e.title_ar)}${e.published?'':' <small>(مخفية)</small>'}${wr?' <small style="color:#f5a524">⚠ '+wr+'</small>':''}</td><td>${e.delivery=='cont'?'ذاتية مستمرة':e.delivery=='self'?'ذاتية':esc(e.start_date)}</td><td><span class="s ${o?'o':''}">${s}</span></td><td><button data-a="e" data-i="${e.id}">تعديل</button> <button data-a="c" data-i="${e.id}">${e.closed?'فتح التسجيل':'قفل التسجيل'}</button> <button data-a="p" data-i="${e.id}">${e.published?'إخفاء':'نشر'}</button> <button data-a="k" data-i="${e.id}">${Number(e.show_ended)?'إخفاء بعد الانتهاء':'إبقاء بعد الانتهاء'}</button> <button data-a="l" data-i="${e.id}">نسخ الرابط</button> <button class="d" data-a="x" data-i="${e.id}">حذف</button></td></tr>`}).join('')||'<tr><td colspan=4>لا توجد فعاليات بعد.</td></tr>'}
 async function load(){try{rows=await api('/api/admin/events');draw()}catch{msg('تعذر التحميل، تأكد من إعداد الحماية وقاعدة البيانات')}}
 function fill(e){F.forEach(k=>$('#'+k).value=e?e[k]||'':(k=='type'?'ev':k=='city'?'r':k=='mode'?'onsite':k=='delivery'?'live':''));$('#closed').checked=!!(e&&e.closed);$('#published').checked=e?!!e.published:true;$('#show_ended').checked=!!(e&&Number(e.show_ended));eid=e?e.id:null;$('#ft').textContent=e?'تعديل فعالية':'إضافة فعالية';$('#org_logo_file').value='';orgInfo();togDel()}
 $('#save').onclick=async()=>{const b={};F.forEach(k=>b[k]=$('#'+k).value);b.closed=$('#closed').checked;b.published=$('#published').checked;b.show_ended=$('#show_ended').checked;
- if(!b.title_ar||(b.delivery=='live'&&!b.start_date)||(b.delivery=='self'&&!b.end_date))return msg('العنوان مطلوب، وتاريخ البداية للمباشر، وتاريخ النهاية للذاتية');
+ if(!b.title_ar||(b.delivery=='live'&&!b.start_date&&!b.deadline)||(b.delivery=='self'&&!b.end_date))return msg('العنوان مطلوب. للمباشر: تاريخ البداية أو آخر موعد للتقديم على الأقل. للذاتية: تاريخ النهاية');
  const lf=$('#org_logo_file').files[0];if(lf){try{b.org_logo=await toDataUrl(lf)}catch{return msg('تعذر قراءة صورة الشعار')}}
  {const dm=datesMsg(b.start_date,b.end_date,b.deadline);if(dm)return msg(dm)}
  try{await api(eid?'/api/admin/events/'+eid:'/api/admin/events',J(eid?'PUT':'POST',b));fill(null);msg('تم الحفظ ✓');load();loadOrgs()}catch{msg('فشل الحفظ')}};
