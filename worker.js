@@ -172,6 +172,15 @@ async function adminSubs(request, env, parts) {
 
 // صفحة رابط الفعالية /e/ID: نفس الموقع مع عنوان ومعاينة مشاركة خاصة بالفعالية
 const attr = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function ogLogo(env, org, origin) {
+  try {
+    const n = String(org || '').split('|')[0].trim(); if (!n) return '';
+    await env.DB.prepare(ORG_SQL).run();
+    const o = await env.DB.prepare("SELECT id,updated FROM organizers WHERE name=? AND logo IS NOT NULL AND logo!=''").bind(n).first();
+    return o ? origin + '/api/logo/' + o.id + '?v=' + o.updated : '';
+  } catch { return ''; }
+}
+const ogImg = (html, img) => img ? html.replace(/<meta property="og:image" content="[^"]*">/, () => `<meta property="og:image" content="${attr(img)}">`).replace(/<meta name="twitter:image" content="[^"]*">/, () => `<meta name="twitter:image" content="${attr(img)}">`) : html;
 async function eventPage(request, env, id) {
   const url = new URL(request.url);
   let html = await (await env.ASSETS.fetch(new Request(url.origin + '/'))).text();
@@ -188,6 +197,7 @@ async function eventPage(request, env, id) {
         .replace(/<meta property="og:description" content="[^"]*">/, () => `<meta property="og:description" content="${desc}">`)
         .replace(/<meta property="og:url" content="[^"]*">/, () => `<meta property="og:url" content="${page}">`)
         .replace(/<link rel="canonical" href="[^"]*">/, () => `<link rel="canonical" href="${page}">`);
+      html = ogImg(html, await ogLogo(env, e.org, url.origin));
     }
   } catch {}
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...SEC } });
@@ -359,6 +369,7 @@ async function jobPage(request, env, id) {
         .replace(/<meta property="og:description" content="[^"]*">/, () => `<meta property="og:description" content="${desc}">`)
         .replace(/<meta property="og:url" content="[^"]*">/, () => `<meta property="og:url" content="${page}">`)
         .replace(/<link rel="canonical" href="[^"]*">/, () => `<link rel="canonical" href="${page}">`);
+      html = ogImg(html, await ogLogo(env, e.org, url.origin));
     }
   } catch {}
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...SEC } });
