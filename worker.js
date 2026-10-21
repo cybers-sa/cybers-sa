@@ -213,7 +213,7 @@ let jobsReady = false;
 async function ensureJobs(db) {
   if (jobsReady) return;
   for (const q of [JOB_SQL, APP_SQL, CV_SQL, ORG_SQL]) await db.prepare(q).run();
-  await addCols(db, 'jobs', { exp: '', place: '', link: '' });
+  await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0] });
   jobsReady = true;
 }
 const jq = s => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
@@ -222,10 +222,10 @@ const todayRiyadh = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(
 
 async function publicJobs(env) {
   await ensureJobs(env.DB);
-  const r = await env.DB.prepare("SELECT j.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM jobs j LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(j.org,'|')>0 THEN substr(j.org,1,instr(j.org,'|')-1) ELSE j.org END) WHERE j.published=1 AND (j.deadline IS NULL OR j.deadline='' OR j.deadline>=?) ORDER BY j.id DESC").bind(todayRiyadh()).all();
+  const r = await env.DB.prepare("SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id=j.id) n, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM jobs j LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(j.org,'|')>0 THEN substr(j.org,1,instr(j.org,'|')-1) ELSE j.org END) WHERE j.published=1 AND (j.deadline IS NULL OR j.deadline='' OR j.deadline>=?) ORDER BY j.id DESC").bind(todayRiyadh()).all();
   return Response.json(r.results.map(e => ({
     id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, place: e.place || '', mode: e.mode === 'online' ? 'online' : 'onsite', kind: e.kind,
-    deadline: e.deadline || '', closed: !!e.closed, exp: e.exp || '', created: e.created_at || '', ref: 'CYB-' + String(e.created_at || '').slice(0, 4) + '-' + String(e.id).padStart(3, '0'), desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' }, q: jq(e.questions),
+    deadline: e.deadline || '', closed: !!e.closed || (Number(e.max_apps) > 0 && e.n >= Number(e.max_apps)), exp: e.exp || '', created: e.created_at || '', ref: 'CYB-' + String(e.created_at || '').slice(0, 4) + '-' + String(e.id).padStart(3, '0'), desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' }, q: jq(e.questions),
     logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : '', link: /^https?:\/\//i.test(e.link || '') ? e.link : ''
   })), { headers: { 'Cache-Control': 'no-store' } });
 }
@@ -256,6 +256,7 @@ async function apply(request, env) {
     if (!job) return j({ error: 'nojob' }, 404);
     if (job.link) return j({ error: 'external' }, 409);
     if (job.closed || (job.deadline && job.deadline < todayRiyadh())) return j({ error: 'closed' }, 409);
+    if (Number(job.max_apps) > 0 && (await db.prepare('SELECT COUNT(*) c FROM applications WHERE job_id=?').bind(job.id).first()).c >= Number(job.max_apps)) return j({ error: 'closed' }, 409);
     const qs = jq(job.questions);
     let ans; try { ans = JSON.parse(v('answers', 500) || '[]'); } catch { ans = null; }
     if (!Array.isArray(ans) || ans.length !== qs.length || ans.some(a => a !== 'y' && a !== 'n')) return j({ error: 'invalid' }, 400);
@@ -285,14 +286,14 @@ function jclean(b) {
   const s = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n);
   const qs = (Array.isArray(b.questions) ? b.questions : []).map(x => String(x).trim().slice(0, 250)).filter(Boolean).slice(0, 10);
   return [s('title_ar'), s('title_en'), s('org'), CITIES.concat('x').includes(b.city) ? b.city : 'r', JMODES.includes(b.mode) ? b.mode : 'onsite',
-    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : ''];
+    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0))];
 }
-const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link'.split(',');
+const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps'.split(',');
 async function adminJobs(request, env, id) {
   const m = request.method, db = env.DB;
   try {
     await ensureJobs(db);
-    if (m === 'GET') return j((await db.prepare('SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id=j.id) n FROM jobs j ORDER BY j.id DESC').all()).results.map(r => ({ ...r, questions: jq(r.questions) })));
+    if (m === 'GET') return j((await db.prepare('SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id=j.id) n FROM jobs j ORDER BY j.id DESC').all()).results.map(r => ({ ...r, max_apps: Number(r.max_apps) || 0, questions: jq(r.questions) })));
     if (m === 'POST' || (m === 'PUT' && id)) {
       const b = await request.json();
       if (!String(b.title_ar || '').trim()) return j({ error: 'title' }, 400);
