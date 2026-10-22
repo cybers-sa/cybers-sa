@@ -450,6 +450,32 @@ async function adminStats(request, env) {
   } catch { return j({ error: 'server' }, 500); }
 }
 
+// ---------- روابط المتابعة (واتساب، X، ...) ----------
+const PL = ['whatsapp', 'x', 'telegram', 'linkedin', 'instagram', 'youtube', 'tiktok', 'snapchat', 'github'];
+const PL_DEF = { x: 'https://x.com/Cybers_SA', telegram: 'https://t.me/Cybers_SA', linkedin: 'https://www.linkedin.com/company/cybers-sa' };
+async function getLinks(db) {
+  try {
+    await db.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
+    const r = await db.prepare("SELECT v FROM settings WHERE k='links'").first();
+    if (!r) return { ...PL_DEF };
+    const o = JSON.parse(r.v), out = {};
+    for (const k of PL) if (typeof o[k] === 'string' && /^https:\/\//i.test(o[k]) && o[k].length <= 300) out[k] = o[k];
+    return out;
+  } catch { return { ...PL_DEF }; }
+}
+async function adminLinks(request, env) {
+  try {
+    if (request.method === 'PUT') {
+      const b = await request.json(), out = {};
+      for (const k of PL) { const v = String(b[k] ?? '').trim(); if (!v) continue; if (!/^https:\/\/[^\s]+$/i.test(v) || v.length > 300) return j({ error: 'link', key: k }, 400); out[k] = v; }
+      await getLinks(env.DB);
+      await env.DB.prepare("INSERT INTO settings(k,v) VALUES('links',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify(out)).run();
+      return j({ ok: 1 });
+    }
+    return j(await getLinks(env.DB));
+  } catch { return j({ error: 'server' }, 500); }
+}
+
 export default {
   async fetch(request, env) {
     const p = new URL(request.url).pathname, m = request.method;
@@ -458,6 +484,7 @@ export default {
     if (m === 'GET' && /^\/j\/\d+$/.test(p)) return jobPage(request, env, p.split('/')[2]);
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
     if (p === '/api/t' && m === 'POST') return track(request, env);
+    if (p === '/api/links' && m === 'GET') return new Response(JSON.stringify(await getLinks(env.DB)), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
     if (p === '/api/jobs' && m === 'GET') return publicJobs(env);
     if (p === '/api/apply' && m === 'POST') return apply(request, env);
     if (p.startsWith('/api/logo/') && m === 'GET') return logoImg(env, p.split('/')[3], new URL(request.url).searchParams.get('og') === '1');
@@ -468,6 +495,7 @@ export default {
       if (seg[3] === 'events') return admin(request, env, seg[4]);
       if (seg[3] === 'organizers') return adminOrgs(request, env, seg[4]);
       if (seg[3] === 'stats') return adminStats(request, env);
+      if (seg[3] === 'links') return adminLinks(request, env);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);
       if (seg[3] === 'cv' && seg[4]) return adminCv(env, seg[4], new URL(request.url).searchParams.get('view'));
