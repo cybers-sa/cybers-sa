@@ -95,7 +95,7 @@ async function load(){try{rows=await api('/api/admin/events');draw()}catch{msg('
 function fill(e){F.forEach(k=>$('#'+k).value=e?e[k]||'':(k=='type'?'ev':k=='city'?'r':k=='mode'?'onsite':k=='delivery'?'live':''));$('#closed').checked=!!(e&&e.closed);$('#published').checked=e?!!e.published:true;$('#show_ended').checked=!!(e&&Number(e.show_ended));eid=e?e.id:null;$('#ft').textContent=e?'تعديل فعالية':'إضافة فعالية';$('#org_logo_file').value='';orgInfo();togDel()}
 $('#save').onclick=async()=>{const b={};F.forEach(k=>b[k]=$('#'+k).value);b.closed=$('#closed').checked;b.published=$('#published').checked;b.show_ended=$('#show_ended').checked;
  if(!b.title_ar||(b.delivery=='live'&&!b.start_date&&!b.deadline)||(b.delivery=='self'&&!b.end_date))return msg('العنوان مطلوب. للمباشر: تاريخ البداية أو آخر موعد للتقديم على الأقل. للذاتية: تاريخ النهاية');
- const lf=$('#org_logo_file').files[0];if(lf){try{b.org_logo=await toDataUrl(lf)}catch{return msg('تعذر قراءة صورة الشعار')}}
+ const lf=$('#org_logo_file').files[0];if(lf){try{b.org_logo=await toDataUrl(lf);b.org_og=await ogFrom(URL.createObjectURL(lf))}catch{return msg('تعذر قراءة صورة الشعار')}}
  {const dm=datesMsg(b.start_date,b.end_date,b.deadline);if(dm)return msg(dm)}
  try{await api(eid?'/api/admin/events/'+eid:'/api/admin/events',J(eid?'PUT':'POST',b));fill(null);msg('تم الحفظ ✓');load();loadOrgs()}catch{msg('فشل الحفظ')}};
 $('#cancel').onclick=()=>fill(null);
@@ -116,11 +116,13 @@ function togDel(){const v=$('#delivery').value,live=v=='live',cont=v=='cont';
  $('#w_end').style.display=cont?'none':'';$('#w_dl').style.display=cont?'none':'';if(cont){$('#end_date').value='';$('#deadline').value=''}}
 $('#delivery').onchange=()=>{if($('#delivery').value!='live'){$('#mode').value='online';$('#city').value='o'}togDel()};
 let orgs=[];
-async function loadOrgs(){try{orgs=await api('/api/admin/organizers');$('#orgs').innerHTML=orgs.map(o=>`<option value="${esc(o.name)}">`).join('');orgInfo();jOrgInfo()}catch{}}
+async function backfillOg(){for(const o of orgs.filter(x=>x.hl&&!x.ho)){try{const og=await ogFrom('/api/logo/'+o.id+'?v='+o.updated);await api('/api/admin/organizers/'+o.id,J('PUT',{og}));o.ho=1}catch{}}}
+async function loadOrgs(){try{orgs=await api('/api/admin/organizers');backfillOg();$('#orgs').innerHTML=orgs.map(o=>`<option value="${esc(o.name)}">`).join('');orgInfo();jOrgInfo()}catch{}}
 function orgInfo(){const n=$('#org').value.split('|')[0].trim().toLowerCase(),o=orgs.find(x=>x.name.toLowerCase()==n),p=$('#org_prev'),h=$('#org_hint');
  if(o&&o.hl){p.src='/api/logo/'+o.id+'?v='+o.updated;p.style.display='block';h.textContent='✓ لهذه الجهة شعار محفوظ، ارفع ملفًا جديدًا فقط إذا تبغى تغييره'}
  else{p.style.display='none';h.textContent=n?'ما فيه شعار محفوظ لهذه الجهة، ارفعه مرة واحدة وسيُحفظ':''}}
 $('#org').oninput=orgInfo;
+function ogFrom(src){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=1200;c.height=630;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,1200,630);const r=Math.min(900/im.width,380/im.height,3),w=im.width*r,h=im.height*r;x.imageSmoothingQuality='high';x.drawImage(im,(1200-w)/2,(630-h)/2,w,h);ok(c.toDataURL('image/jpeg',0.88))};im.onerror=no;im.src=src})}
 function toDataUrl(f){return new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const m=256,r=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*r));c.height=Math.max(1,Math.round(im.height*r));c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/webp',0.85))};im.onerror=no;im.src=u})}
 
 /* ---- التبويبات ---- */
@@ -137,7 +139,7 @@ async function jload(){try{jobs=await api('/api/admin/jobs');jdraw()}catch{jmsg(
 const JF=['title_ar','title_en','org','link','kind','city','place','mode','exp','max_apps','deadline','desc_ar','desc_en'];
 function jfill(j){JF.forEach(k=>$('#j_'+k).value=j?j[k]||'':(k=='kind'?'full':k=='city'?'r':k=='mode'?'onsite':''));$('#j_q').value=j?j.questions.join('\n'):'';$('#j_closed').checked=!!(j&&j.closed);$('#j_published').checked=j?!!j.published:true;jid=j?j.id:null;$('#jft').textContent=j?'تعديل وظيفة':'إضافة وظيفة';$('#j_org_logo_file').value='';jOrgInfo()}
 $('#jsave').onclick=async()=>{const b={};JF.forEach(k=>b[k]=$('#j_'+k).value);b.questions=$('#j_q').value.split('\n').map(x=>x.trim()).filter(Boolean);b.closed=$('#j_closed').checked;b.published=$('#j_published').checked;
- if(!b.title_ar.trim())return jmsg('المسمى الوظيفي مطلوب');if(b.link.trim()&&!/^https?:\/\//i.test(b.link.trim()))return jmsg('الرابط لازم يبدأ بـ https://');const lf=$('#j_org_logo_file').files[0];if(lf){try{b.org_logo=await toDataUrl(lf)}catch{return jmsg('تعذر قراءة صورة الشعار')}}if(b.questions.length>10)return jmsg('الحد الأقصى 10 أسئلة');{const dm=datesMsg('','',b.deadline);if(dm)return jmsg(dm)}
+ if(!b.title_ar.trim())return jmsg('المسمى الوظيفي مطلوب');if(b.link.trim()&&!/^https?:\/\//i.test(b.link.trim()))return jmsg('الرابط لازم يبدأ بـ https://');const lf=$('#j_org_logo_file').files[0];if(lf){try{b.org_logo=await toDataUrl(lf);b.org_og=await ogFrom(URL.createObjectURL(lf))}catch{return jmsg('تعذر قراءة صورة الشعار')}}if(b.questions.length>10)return jmsg('الحد الأقصى 10 أسئلة');{const dm=datesMsg('','',b.deadline);if(dm)return jmsg(dm)}
  try{await api(jid?'/api/admin/jobs/'+jid:'/api/admin/jobs',J(jid?'PUT':'POST',b));jfill(null);jmsg('تم الحفظ ✓');jload();loadOrgs()}catch{jmsg('فشل الحفظ')}};
 $('#jcancel').onclick=()=>jfill(null);
 function jOrgInfo(){const n=$('#j_org').value.split('|')[0].trim().toLowerCase(),o=orgs.find(x=>x.name.toLowerCase()==n),p=$('#j_org_prev'),h=$('#j_org_hint');

@@ -48,17 +48,21 @@ const ORG_SQL = "CREATE TABLE IF NOT EXISTS organizers (id INTEGER PRIMARY KEY A
 const LOGO = /^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+\/=]+$/;
 const logoOk = l => typeof l === 'string' && l.length <= 200000 && LOGO.test(l);
 const orgKey = n => String(n || '').split('|')[0].trim().slice(0, 200);
-async function saveLogo(db, name, logo) {
+let orgReady = false;
+async function ensureOrg(db) { if (orgReady) return; await db.prepare(ORG_SQL).run(); await addCols(db, 'organizers', { og: '' }); orgReady = true; }
+const OGJ = /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/, ogOk = l => typeof l === 'string' && l.length <= 250000 && OGJ.test(l);
+async function saveLogo(db, name, logo, og) {
   name = orgKey(name);
   if (!name || !logo) return;
-  await db.prepare(ORG_SQL).run();
-  await db.prepare('INSERT INTO organizers(name,logo,updated) VALUES(?,?,?) ON CONFLICT(name) DO UPDATE SET logo=excluded.logo, updated=excluded.updated')
-    .bind(name, logo, Date.now()).run();
+  await ensureOrg(db);
+  await db.prepare('INSERT INTO organizers(name,logo,og,updated) VALUES(?,?,?,?) ON CONFLICT(name) DO UPDATE SET logo=excluded.logo, og=excluded.og, updated=excluded.updated')
+    .bind(name, logo, ogOk(og) ? og : '', Date.now()).run();
 }
-async function logoImg(env, id) {
+async function logoImg(env, id, og) {
   try {
-    const r = await env.DB.prepare('SELECT logo FROM organizers WHERE id=?').bind(id).first();
-    const m = r && logoOk(r.logo) && r.logo.match(/^data:(image\/\w+);base64,(.*)$/);
+    await ensureOrg(env.DB);
+    const r = await env.DB.prepare('SELECT logo, og FROM organizers WHERE id=?').bind(id).first();
+    const m = r && (og && ogOk(r.og) ? r.og.match(/^data:(image\/\w+);base64,(.*)$/) : logoOk(r.logo) && r.logo.match(/^data:(image\/\w+);base64,(.*)$/));
     if (!m) return new Response('Not found', { status: 404 });
     const bin = Uint8Array.from(atob(m[2]), c => c.charCodeAt(0));
     return new Response(bin, { headers: { 'Content-Type': m[1], 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' } });
@@ -66,7 +70,7 @@ async function logoImg(env, id) {
 }
 
 async function publicEvents(env) {
-  await env.DB.prepare(ORG_SQL).run();
+  await ensureOrg(env.DB);
   await migrate(env.DB);
   const r = await env.DB.prepare("SELECT e.*, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM events e LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(e.org,'|')>0 THEN substr(e.org,1,instr(e.org,'|')-1) ELSE e.org END) WHERE e.published=1").all();
   const out = r.results.map(e => ({
@@ -102,7 +106,7 @@ async function admin(request, env, id) {
       const v = clean(b);
       if (m === 'POST') await db.prepare(`INSERT INTO events(${cols}) VALUES(${cols.map(() => '?')})`).bind(...v).run();
       else await db.prepare(`UPDATE events SET ${cols.map(c => c + '=?')} WHERE id=?`).bind(...v, id).run();
-      if (b.org_logo) await saveLogo(db, b.org, b.org_logo);
+      if (b.org_logo) await saveLogo(db, b.org, b.org_logo, b.org_og);
       return j({ ok: 1 }, m === 'POST' ? 201 : 200);
     }
     if (m === 'DELETE' && id) { await db.prepare('DELETE FROM events WHERE id=?').bind(id).run(); return j({ ok: 1 }); }
@@ -111,9 +115,15 @@ async function admin(request, env, id) {
 }
 
 // ---------- طلبات "أرسل فعاليتك" ----------
-async function adminOrgs(env) {
-  await env.DB.prepare(ORG_SQL).run();
-  return j((await env.DB.prepare("SELECT id,name,updated,(logo IS NOT NULL AND logo!='') hl FROM organizers ORDER BY name").all()).results);
+async function adminOrgs(request, env, id) {
+  await ensureOrg(env.DB);
+  if (request.method === 'PUT' && /^\d+$/.test(id || '')) {
+    const b = await request.json().catch(() => ({}));
+    if (!ogOk(b.og)) return j({ error: 'bad' }, 400);
+    await env.DB.prepare('UPDATE organizers SET og=? WHERE id=?').bind(b.og, id).run();
+    return j({ ok: 1 });
+  }
+  return j((await env.DB.prepare("SELECT id,name,updated,(logo IS NOT NULL AND logo!='') hl, (og IS NOT NULL AND og!='') ho FROM organizers ORDER BY name").all()).results);
 }
 
 const SUB_SQL = "CREATE TABLE IF NOT EXISTS submissions (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title_ar TEXT, title_en TEXT, city TEXT, mode TEXT, delivery TEXT DEFAULT 'live', start_date TEXT, end_date TEXT, deadline TEXT, org TEXT, link TEXT, contact TEXT, notes TEXT, ip_hash TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
@@ -175,9 +185,9 @@ const attr = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<':
 async function ogLogo(env, org, origin) {
   try {
     const n = String(org || '').split('|')[0].trim(); if (!n) return '';
-    await env.DB.prepare(ORG_SQL).run();
+    await ensureOrg(env.DB);
     const o = await env.DB.prepare("SELECT id,updated FROM organizers WHERE name=? AND logo IS NOT NULL AND logo!=''").bind(n).first();
-    return o ? origin + '/api/logo/' + o.id + '?v=' + o.updated : '';
+    return o ? origin + '/api/logo/' + o.id + '?og=1&v=' + o.updated : '';
   } catch { return ''; }
 }
 const ogImg = (html, img) => img ? html.replace(/<meta property="og:image" content="[^"]*">/, () => `<meta property="og:image" content="${attr(img)}">`).replace(/<meta name="twitter:image" content="[^"]*">/, () => `<meta name="twitter:image" content="${attr(img)}">`) : html;
@@ -212,7 +222,8 @@ const MAXCV = 4 * 1024 * 1024, CH = 450000;
 let jobsReady = false;
 async function ensureJobs(db) {
   if (jobsReady) return;
-  for (const q of [JOB_SQL, APP_SQL, CV_SQL, ORG_SQL]) await db.prepare(q).run();
+  for (const q of [JOB_SQL, APP_SQL, CV_SQL]) await db.prepare(q).run();
+  await ensureOrg(db);
   await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0] });
   jobsReady = true;
 }
@@ -302,7 +313,7 @@ async function adminJobs(request, env, id) {
       const v = jclean(b);
       if (m === 'POST') await db.prepare(`INSERT INTO jobs(${JC}) VALUES(${JC.map(() => '?')})`).bind(...v).run();
       else await db.prepare(`UPDATE jobs SET ${JC.map(c => c + '=?')} WHERE id=?`).bind(...v, id).run();
-      if (b.org_logo) await saveLogo(db, b.org, b.org_logo);
+      if (b.org_logo) await saveLogo(db, b.org, b.org_logo, b.org_og);
       return j({ ok: 1 }, m === 'POST' ? 201 : 200);
     }
     if (m === 'DELETE' && id) { await db.prepare('DELETE FROM jobs WHERE id=?').bind(id).run(); return j({ ok: 1 }); }   // الطلبات والسير تبقى في البنك
@@ -449,13 +460,13 @@ export default {
     if (p === '/api/t' && m === 'POST') return track(request, env);
     if (p === '/api/jobs' && m === 'GET') return publicJobs(env);
     if (p === '/api/apply' && m === 'POST') return apply(request, env);
-    if (p.startsWith('/api/logo/') && m === 'GET') return logoImg(env, p.split('/')[3]);
+    if (p.startsWith('/api/logo/') && m === 'GET') return logoImg(env, p.split('/')[3], new URL(request.url).searchParams.get('og') === '1');
     if (p.startsWith('/api/admin/')) {
       const deny = await auth(request, env);
       if (deny) return deny;
       const seg = p.split('/');
       if (seg[3] === 'events') return admin(request, env, seg[4]);
-      if (seg[3] === 'organizers') return adminOrgs(env);
+      if (seg[3] === 'organizers') return adminOrgs(request, env, seg[4]);
       if (seg[3] === 'stats') return adminStats(request, env);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);
