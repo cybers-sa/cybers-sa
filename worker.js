@@ -49,14 +49,16 @@ const LOGO = /^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+\/=]+$/;
 const logoOk = l => typeof l === 'string' && l.length <= 200000 && LOGO.test(l);
 const orgKey = n => String(n || '').split('|')[0].trim().slice(0, 200);
 let orgReady = false;
-async function ensureOrg(db) { if (orgReady) return; await db.prepare(ORG_SQL).run(); await addCols(db, 'organizers', { og: '' }); orgReady = true; }
+async function ensureOrg(db) { if (orgReady) return; await db.prepare(ORG_SQL).run(); await addCols(db, 'organizers', { og: '', name_en: '', featured: ['INTEGER', 0] }); orgReady = true; }
 const OGJ = /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/, ogOk = l => typeof l === 'string' && l.length <= 250000 && OGJ.test(l);
-async function saveLogo(db, name, logo, og) {
-  name = orgKey(name);
+async function saveLogo(db, fullName, logo, og) {
+  const name = orgKey(fullName);
   if (!name || !logo) return;
   await ensureOrg(db);
   await db.prepare('INSERT INTO organizers(name,logo,og,updated) VALUES(?,?,?,?) ON CONFLICT(name) DO UPDATE SET logo=excluded.logo, og=excluded.og, updated=excluded.updated')
     .bind(name, logo, ogOk(og) ? og : '', Date.now()).run();
+  const en = String(fullName || '').includes('|') ? String(fullName).split('|')[1].trim().slice(0, 200) : '';
+  if (en) await db.prepare('UPDATE organizers SET name_en=? WHERE name=?').bind(en, name).run();
 }
 async function logoImg(env, id, og) {
   try {
@@ -116,14 +118,42 @@ async function admin(request, env, id) {
 
 // ---------- طلبات "أرسل فعاليتك" ----------
 async function adminOrgs(request, env, id) {
-  await ensureOrg(env.DB);
-  if (request.method === 'PUT' && /^\d+$/.test(id || '')) {
-    const b = await request.json().catch(() => ({}));
-    if (!ogOk(b.og)) return j({ error: 'bad' }, 400);
-    await env.DB.prepare('UPDATE organizers SET og=? WHERE id=?').bind(b.og, id).run();
-    return j({ ok: 1 });
-  }
-  return j((await env.DB.prepare("SELECT id,name,updated,(logo IS NOT NULL AND logo!='') hl, (og IS NOT NULL AND og!='') ho FROM organizers ORDER BY name").all()).results);
+  const db = env.DB, m = request.method, num = /^\d+$/.test(id || '');
+  try {
+    await ensureOrg(db);
+    if (m === 'PUT' && num) {
+      const b = await request.json().catch(() => ({}));
+      if (b.og !== undefined) { if (!ogOk(b.og)) return j({ error: 'bad' }, 400); await db.prepare('UPDATE organizers SET og=? WHERE id=?').bind(b.og, id).run(); }
+      if (b.featured !== undefined) {
+        if (b.featured) {
+          const cur = await db.prepare('SELECT featured f FROM organizers WHERE id=?').bind(id).first();
+          if (cur && !Number(cur.f)) await db.prepare('UPDATE organizers SET featured=(SELECT COALESCE(MAX(featured),0)+1 FROM organizers) WHERE id=?').bind(id).run();
+        } else await db.prepare('UPDATE organizers SET featured=0 WHERE id=?').bind(id).run();
+      }
+      return j({ ok: 1 });
+    }
+    if (m === 'DELETE' && num) { await db.prepare('DELETE FROM organizers WHERE id=?').bind(id).run(); return j({ ok: 1 }); }
+    if (m === 'POST') {
+      const b = await request.json().catch(() => ({})), full = String(b.name || '').trim().slice(0, 300), key = orgKey(full);
+      if (!key) return j({ error: 'name' }, 400);
+      if (b.org_logo && !logoOk(b.org_logo)) return j({ error: 'logo' }, 400);
+      const en = full.includes('|') ? full.split('|')[1].trim().slice(0, 200) : '';
+      if (b.org_logo) await saveLogo(db, full, b.org_logo, b.org_og);
+      else await db.prepare('INSERT OR IGNORE INTO organizers(name,logo,updated) VALUES(?,?,?)').bind(key, '', Date.now()).run();
+      if (en) await db.prepare('UPDATE organizers SET name_en=? WHERE name=?').bind(en, key).run();
+      const o = await db.prepare('SELECT id FROM organizers WHERE name=?').bind(key).first();
+      if (o && b.featured !== false) await db.prepare('UPDATE organizers SET featured=(SELECT COALESCE(MAX(featured),0)+1 FROM organizers) WHERE id=? AND COALESCE(featured,0)=0').bind(o.id).run();
+      return j({ ok: 1 }, 201);
+    }
+    return j((await db.prepare("SELECT id,name,name_en,featured,updated,(logo IS NOT NULL AND logo!='') hl, (og IS NOT NULL AND og!='') ho FROM organizers ORDER BY name").all()).results);
+  } catch { return j({ error: 'server' }, 500); }
+}
+async function publicOrgs(env) {
+  try {
+    await ensureOrg(env.DB);
+    const r = (await env.DB.prepare("SELECT id,name,name_en,updated,(logo IS NOT NULL AND logo!='') hl FROM organizers WHERE featured>0 ORDER BY featured").all()).results;
+    return new Response(JSON.stringify(r.map(o => ({ name: o.name, en: o.name_en || '', logo: o.hl ? '/api/logo/' + o.id + '?v=' + o.updated : '' }))), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
+  } catch { return j([]); }
 }
 
 const SUB_SQL = "CREATE TABLE IF NOT EXISTS submissions (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title_ar TEXT, title_en TEXT, city TEXT, mode TEXT, delivery TEXT DEFAULT 'live', start_date TEXT, end_date TEXT, deadline TEXT, org TEXT, link TEXT, contact TEXT, notes TEXT, ip_hash TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
@@ -484,6 +514,7 @@ export default {
     if (m === 'GET' && /^\/j\/\d+$/.test(p)) return jobPage(request, env, p.split('/')[2]);
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
     if (p === '/api/t' && m === 'POST') return track(request, env);
+    if (p === '/api/orgs' && m === 'GET') return publicOrgs(env);
     if (p === '/api/links' && m === 'GET') return new Response(JSON.stringify(await getLinks(env.DB)), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
     if (p === '/api/jobs' && m === 'GET') return publicJobs(env);
     if (p === '/api/apply' && m === 'POST') return apply(request, env);
