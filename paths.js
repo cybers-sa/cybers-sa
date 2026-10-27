@@ -22,7 +22,7 @@ var CSS=".cp{max-width:900px;margin:0 auto}.cp *{box-sizing:border-box}.cp-h h2{
 ".cp-ph{display:flex;gap:12px;align-items:center;margin:6px 0 14px}.cp-ph .e{font-size:40px;line-height:1}.cp-ph h2{margin:0;font-size:22px;line-height:1.3}.cp-ph small{color:var(--muted)}"+
 ".cp-trail{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:8px 0;margin-bottom:6px;scrollbar-width:none}.cp-trail::-webkit-scrollbar{display:none}.cp-trail>span{color:var(--muted);font-size:12px;flex:none}"+
 ".cp-t{flex:none;font:inherit;font-size:12.5px;padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}.cp-t.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent)}.cp-t.c{color:var(--muted)}"+
-".cp-root{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border-radius:12px;padding:9px 16px;font-weight:700;font-size:15px;max-width:100%}"+
+".cp-card.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.cp-open{grid-column:1/-1;background:color-mix(in srgb,var(--accent) 6%,transparent);border:1px solid var(--line);border-radius:16px;padding:14px}.cp-x2{margin-inline-start:6px;opacity:.8;font-size:13px}.cp-root{font:inherit;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border-radius:12px;padding:9px 16px;font-weight:700;font-size:15px;max-width:100%}"+
 ".cp-br{list-style:none;margin:0;margin-inline-start:22px;padding:6px 0 0;padding-inline-start:18px;border-inline-start:2px solid var(--line)}.cp-br>li{position:relative;margin:0 0 12px;padding-top:6px}"+
 ".cp-br>li::before{content:'';position:absolute;inset-inline-start:-18px;top:34px;width:18px;border-top:2px solid var(--line)}"+
 ".cp-role{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:border-color .2s}.cp-role.open{border-color:var(--accent)}.cp-role.fl{animation:cpf 1.4s}@keyframes cpf{0%,60%{box-shadow:0 0 0 3px var(--accent2)}100%{box-shadow:0 0 0 0 transparent}}"+
@@ -68,22 +68,27 @@ function roleHtml(rid){var t=T(),R=S.data.roles[rid],ls=lvls(R),open=!!S.open[ri
 function trailHtml(){var t=T();if(!S.trail.length)return"";var h='<div class="cp-trail"><span>'+t.trail+"</span>";
  S.trail.forEach(function(x,i){var R=S.data.roles[x[0]];h+='<button class="cp-t'+(i==S.trail.length-1?" on":"")+'" data-t="'+i+'">'+esc(rname(R))+" · "+x[1]+"</button>"});
  return h+'<button class="cp-t c" data-clear="1">'+t.clear+" ✕</button></div>"}
+function cols(){return window.matchMedia("(min-width:800px)").matches?3:2}
+function tree(){var t=T(),p=S.p;
+ return'<div class="cp-open">'+trailHtml()+'<button class="cp-root" data-close="1" aria-expanded="true">'+p.ico+" "+esc(pname(p))+'<span class="cp-x2">✕</span></button><ul class="cp-br">'+p.roles.map(roleHtml).join("")+"</ul></div>"}
+function group(list,cls){var t=T(),c=cols(),k=-1,h="";
+ list.forEach(function(p,i){if(S.p&&S.p.id==p.id)k=i});var end=k<0?-1:Math.min(list.length-1,k-k%c+c-1);
+ list.forEach(function(p,i){h+='<button class="cp-card'+(k==i?" sel":"")+'" data-p="'+p.id+'" aria-expanded="'+(k==i)+'"><span class="e">'+p.ico+"</span><b>"+esc(pname(p))+"</b>"+stars(p.st)+"<small>"+esc(L()=="ar"?p.fa:p.fe)+"</small><i>"+p.roles.length+" "+t.roles+"</i></button>";if(i==end)h+=tree()});
+ return'<div class="cp-grid '+cls+'">'+h+"</div>"}
 function home(){var t=T(),P=S.data.paths;
- function card(p){return'<button class="cp-card" data-p="'+p.id+'"><span class="e">'+p.ico+"</span><b>"+esc(pname(p))+"</b>"+stars(p.st)+"<small>"+esc(L()=="ar"?p.fa:p.fe)+"</small><i>"+p.roles.length+" "+t.roles+"</i></button>"}
- return'<div class="cp"><div class="cp-h"><h2>'+t.h+"</h2><p>"+t.sub+'</p></div><div class="cp-grid">'+P.filter(function(p){return!p.x}).map(card).join("")+'</div><h3 class="cp-sub">'+t.more+'</h3><div class="cp-grid cp-x">'+P.filter(function(p){return p.x}).map(card).join("")+'</div><p class="cp-src">'+t.src+"</p></div>"}
-function pathView(){var t=T(),p=S.p;
- return'<div class="cp"><button class="cp-back" data-home="1">'+(L()=="ar"?"›":"‹")+" "+t.all+'</button><div class="cp-ph"><span class="e">'+p.ico+"</span><div><h2>"+esc(pname(p))+"</h2><small>"+esc(L()=="ar"?p.fa:p.fe)+" · "+stars(p.st)+"</small></div></div>"+trailHtml()+
- '<div class="cp-root">'+p.ico+" "+esc(pname(p))+'</div><ul class="cp-br">'+p.roles.map(roleHtml).join("")+'</ul><p class="cp-src">'+t.src+"</p></div>"}
+ return'<div class="cp"><div class="cp-h"><h2>'+t.h+"</h2><p>"+t.sub+"</p></div>"+group(P.filter(function(p){return!p.x}),"")+'<h3 class="cp-sub">'+t.more+"</h3>"+group(P.filter(function(p){return p.x}),"cp-x")+"</div>"}
 function hash(){var h="#paths";if(S.p){h+="/"+S.p.id;if(S.r){h+="/"+S.r;if(S.l)h+="/"+S.l}}try{history.replaceState(null,"",location.pathname+location.search+h)}catch(e){}}
-function draw(){if(!S.data)return;$("#cp").innerHTML=S.p?pathView():home()}
-function select(pid){S.p=S.data.paths.filter(function(p){return p.id==pid})[0]||null;S.r=null;S.l=null;S.open={};if(S.p&&S.p.roles.length==1){S.open[S.p.roles[0]]=true}draw();hash();window.scrollTo({top:$("#paths").offsetTop-70,behavior:"smooth"})}
+function draw(){if(!S.data)return;$("#cp").innerHTML=home()}
+function select(pid){var same=S.p&&S.p.id==pid;S.r=null;S.l=null;S.open={};
+ if(same){S.p=null}else{S.p=S.data.paths.filter(function(p){return p.id==pid})[0]||null;if(S.p&&S.p.roles.length==1)S.open[S.p.roles[0]]=true}
+ draw();hash();var c=$('.cp-card[data-p="'+pid+'"]');if(c&&!same)window.scrollTo({top:c.getBoundingClientRect().top+window.pageYOffset-80,behavior:"smooth"})}
 function go(rid,n,keep){var p=pathOf(rid,S.p);if(!p)return;S.p=p;S.r=rid;S.l=n;S.open[rid]=true;
  if(!keep){var i=-1;S.trail.forEach(function(x,k){if(x[0]==rid&&x[1]==n)i=k});if(i>-1)S.trail=S.trail.slice(0,i+1);else S.trail.push([rid,n])}
  draw();hash();var e=$("#r-"+rid);if(e){e.classList.add("fl");var y=e.getBoundingClientRect().top+window.pageYOffset-80;window.scrollTo({top:y,behavior:"smooth"})}}
 function init(){if(S.inited)return;S.inited=true;css();
  $("#cp").addEventListener("click",function(e){var b;
   if(b=e.target.closest("[data-p]"))return select(b.dataset.p);
-  if(e.target.closest("[data-home]")){S.p=null;S.r=null;S.l=null;draw();hash();return}
+  if(e.target.closest("[data-close]")){var id=S.p&&S.p.id;S.p=null;S.r=null;S.l=null;draw();hash();var c=id&&$('.cp-card[data-p="'+id+'"]');if(c)window.scrollTo({top:c.getBoundingClientRect().top+window.pageYOffset-80,behavior:"smooth"});return}
   if(b=e.target.closest("[data-go]")){var a=b.dataset.go.split("|");return go(a[0],+a[1])}
   if(b=e.target.closest("[data-l]")){var a=b.dataset.l.split("|");if(b.disabled)return;return go(a[0],+a[1])}
   if(b=e.target.closest("[data-t]")){var x=S.trail[+b.dataset.t];S.trail=S.trail.slice(0,+b.dataset.t+1);return go(x[0],x[1],true)}
@@ -91,6 +96,7 @@ function init(){if(S.inited)return;S.inited=true;css();
   if(b=e.target.closest("[data-r]")){var r=b.dataset.r;S.open[r]=!S.open[r];if(!S.open[r]&&S.r==r){S.r=null;S.l=null}draw();hash()}});
  var h=location.hash.replace(/^#paths\/?/,"").split("/").filter(Boolean);
  if(h[0]){S.p=S.data.paths.filter(function(p){return p.id==h[0]})[0]||null;if(S.p&&h[1]&&S.data.roles[h[1]]){S.open[h[1]]=true;S.r=h[1];if(h[2]&&S.data.roles[h[1]].lv[h[2]]){S.l=+h[2];S.trail=[[h[1],S.l]]}}}}
+var rz;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){if(S.data&&$("#paths").style.display!="none"&&S.cols!=cols()){S.cols=cols();draw()}},150)});
 window.CP={open:function(){var el=$("#cp");if(!el)return;document.querySelector(".hero").classList.add("cp-on");
   if(S.data){draw();return}
   fetch("/paths.json?v=1").then(function(r){return r.json()}).then(function(d){S.data=d;init();draw()}).catch(function(){el.innerHTML='<p style="color:var(--muted)">⚠</p>'})},
