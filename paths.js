@@ -1,15 +1,15 @@
 (function(){
 "use strict";
-var S={data:null,p:null,open:{},r:null,l:null,trail:[]};
+var S={pk:{},data:null,p:null,open:{},r:null,l:null,trail:[]};
 var $=function(s){return document.querySelector(s)};
 var L=function(){return document.documentElement.lang=="en"?"en":"ar"};
 var U={
 ar:{h:"مسارات الأمن السيبراني",sub:"اختر مسارك، ثم استكشف الأدوار الوظيفية ومستوياتها وكيف تنتقل بينها.",more:"مسارات إضافية",all:"كل المسارات",roles:"أدوار",diff:"الصعوبة",about:"عن الدور",lv:"المستوى",exp:"الخبرة",yrs:"سنة",entry:"بدون خبرة",from:"جاء من",next:"الخطوة التالية",mk:"مسميات شائعة في سوق العمل السعودي",trail:"رحلتك",clear:"مسح",
 src:"الأدوار والمستويات والانتقالات: الإطار السعودي لكوادر الأمن السيبراني (سيوف) – الهيئة الوطنية للأمن السيبراني. المسميات: إعلانات وظيفية سعودية منشورة.",
-grad:"خريج بمؤهل علمي",tech:"أدوار فنية للأمن السيبراني",core:"أدوار رئيسية للأمن السيبراني",mgmt:"أدوار إدارية أو موارد بشرية",lvl:"المستوى",levels:"مستويات",rng:"المستويات",none:"—",ar_note:"",sum:"ملخص الدور",tasks:"المهمات والمسؤوليات"},
+grad:"خريج بمؤهل علمي",tech:"أدوار فنية للأمن السيبراني",core:"أدوار رئيسية للأمن السيبراني",mgmt:"أدوار إدارية أو موارد بشرية",lvl:"المستوى",levels:"مستويات",rng:"المستويات",none:"—",goto:"الانتقال إلى هذا المستوى",ar_note:"",sum:"ملخص الدور",tasks:"المهمات والمسؤوليات"},
 en:{h:"Cybersecurity Career Paths",sub:"Pick a path, then explore its roles, levels and how to move between them.",more:"More paths",all:"All paths",roles:"roles",diff:"Difficulty",about:"About the role",lv:"Level",exp:"Experience",yrs:"yrs",entry:"Entry",from:"Comes from",next:"Next step",mk:"Common titles in the Saudi job market",trail:"Your journey",clear:"Clear",
 src:"Roles, levels and transitions: Saudi Cybersecurity Workforce Framework (SCyWF) – National Cybersecurity Authority. Titles: public Saudi job postings.",
-grad:"Graduate with academic qualification",tech:"Cybersecurity technical roles",core:"Cybersecurity core roles",mgmt:"Management or other HR roles",lvl:"Level",levels:"levels",rng:"Levels",none:"—",ar_note:"Official description (Arabic)",sum:"Role summary",tasks:"Tasks and responsibilities"}
+grad:"Graduate with academic qualification",tech:"Cybersecurity technical roles",core:"Cybersecurity core roles",mgmt:"Management or other HR roles",lvl:"Level",levels:"levels",rng:"Levels",none:"—",goto:"Go to this level",ar_note:"Official description (Arabic)",sum:"Role summary",tasks:"Tasks and responsibilities"}
 };
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 var CSS=".cp{max-width:900px;margin:0 auto}.cp *{box-sizing:border-box}.cp-h h2{margin:0 0 6px}.cp-h p{margin:0 0 18px;color:var(--muted)}"+
@@ -36,7 +36,7 @@ var CSS=".cp{max-width:900px;margin:0 auto}.cp *{box-sizing:border-box}.cp-h h2{
 ".cp-g{margin-top:12px}.cp-g>span{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}.cp-cs{display:flex;flex-wrap:wrap;gap:6px}.cp-c{font:inherit;font-size:12.5px;padding:6px 11px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);text-align:start}"+
 "button.cp-c{cursor:pointer;border-color:var(--accent2)}button.cp-c:hover{background:color-mix(in srgb,var(--accent) 14%,transparent)}.cp-c.p{color:var(--muted);border-style:dashed}"+
 ".cp-m{margin-top:14px}.cp-m span{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}.cp-m i{font-style:normal;font-size:12px;padding:4px 10px;border-radius:99px;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent2);display:inline-block;margin:0 0 6px;margin-inline-end:6px}"+
-".cp-cnt{flex:none;font-size:12px;color:var(--muted)}.cp-lv{margin-inline-start:6px;padding-inline-start:16px}.cp-lv>li{padding-top:0;margin:0 0 8px}.cp-lv>li::before{top:22px;inset-inline-start:-16px;width:16px}.cp-lb{font:inherit;color:var(--text);width:100%;display:flex;align-items:center;gap:10px;text-align:start;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);cursor:pointer}.cp-lb b{font-size:14px}.cp-lb em{font-style:normal;color:var(--muted);font-size:12px;flex:1}.cp-lb.on{background:var(--accent);border-color:var(--accent);color:#fff}.cp-lb.on em{color:#ffffffcc}.cp-lb.on .cp-ch{border-color:#fff}.cp-s{margin-inline-start:4px;padding-inline-start:14px;padding-top:0}.cp-s>li{padding-top:0;margin:0 0 7px}.cp-s>li::before{top:19px;inset-inline-start:-14px;width:14px}.cp-n{font:inherit;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:start;padding:8px 11px;border-radius:9px;border:1px solid var(--accent2);background:var(--card);color:var(--text);cursor:pointer;font-size:13px}.cp-n em{font-style:normal;color:var(--muted);font-size:12px;flex:none}.cp-n.p{border-style:dashed;border-color:var(--line);color:var(--muted);cursor:default}button.cp-n:hover{background:color-mix(in srgb,var(--accent) 12%,var(--card))}.cp-d{margin:8px 0 2px;padding:12px}.cp-src{margin:28px 0 4px;font-size:12px;color:var(--muted);line-height:1.8}.hero.cp-on .search,.hero.cp-on .orgs,.hero.cp-on .stats{display:none!important}";
+".cp-cnt{flex:none;font-size:12px;color:var(--muted)}.cp-lv{margin-inline-start:6px;padding-inline-start:16px}.cp-lv>li{padding-top:0;margin:0 0 8px}.cp-lv>li::before{top:22px;inset-inline-start:-16px;width:16px}.cp-lb{font:inherit;color:var(--text);width:100%;display:flex;align-items:center;gap:10px;text-align:start;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);cursor:pointer}.cp-lb b{font-size:14px}.cp-lb em{font-style:normal;color:var(--muted);font-size:12px;flex:1}.cp-lb.on{background:var(--accent);border-color:var(--accent);color:#fff}.cp-lb.on em{color:#ffffffcc}.cp-lb.on .cp-ch{border-color:#fff}.cp-s{margin-inline-start:4px;padding-inline-start:14px;padding-top:0}.cp-s>li{padding-top:0;margin:0 0 7px}.cp-s>li::before{top:19px;inset-inline-start:-14px;width:14px}.cp-n{font:inherit;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:start;padding:8px 11px;border-radius:9px;border:1px solid var(--accent2);background:var(--card);color:var(--text);cursor:pointer;font-size:13px}.cp-n em{font-style:normal;color:var(--muted);font-size:12px;flex:none}.cp-n.p{border-style:dashed;border-color:var(--line);color:var(--muted);cursor:default}button.cp-n:hover{background:color-mix(in srgb,var(--accent) 12%,var(--card))}.cp-d{margin:8px 0 2px;padding:12px}.cp-n.on{background:color-mix(in srgb,var(--accent) 14%,var(--card))}.cp-pk{margin:6px 0 4px;padding:10px 12px}.cp-pk p{font-size:13px;margin:0 0 8px}.cp-go{font:inherit;font-size:13px;color:#fff;background:var(--accent);border:0;border-radius:9px;padding:7px 14px;cursor:pointer}.cp-src{margin:28px 0 4px;font-size:12px;color:var(--muted);line-height:1.8}@media(max-width:640px){.cp-open{padding:8px}.cp-br{margin-inline-start:10px;padding-inline-start:12px}.cp-br>li::before{inset-inline-start:-12px;width:12px}.cp-rb{padding:0 8px 10px}.cp-rh{padding:11px 10px}.cp-lv{margin-inline-start:0;padding-inline-start:10px}.cp-lv>li::before{inset-inline-start:-10px;width:10px}.cp-d{padding:9px}.cp-s{margin-inline-start:0;padding-inline-start:10px}.cp-s>li::before{inset-inline-start:-10px;width:10px}.cp-pk{padding:8px 9px}.cp-n,.cp-lb{padding:8px 9px}}.hero.cp-on .search,.hero.cp-on .orgs,.hero.cp-on .stats{display:none!important}";
 function css(){if(!$("#cp-css")){var s=document.createElement("style");s.id="cp-css";s.textContent=CSS;document.head.appendChild(s)}}
 function T(){return U[L()]}
 function pname(p){return L()=="ar"?p.ar:p.en}
@@ -45,16 +45,20 @@ function stars(n){var o="";for(var i=1;i<=4;i++)o+=i<=n?"★":"<s>★</s>";retur
 function pathOf(rid,pref){var P=S.data.paths;if(pref&&pref.roles.indexOf(rid)>-1)return pref;for(var i=0;i<P.length;i++)if(P[i].roles.indexOf(rid)>-1)return P[i];return null}
 function lvls(r){return Object.keys(r.lv).map(Number).sort()}
 function expTxt(n){var e=S.data.exp[n];return e=="0"?T().entry:e+" "+T().yrs}
-function ref(x){var t=T(),k=x[0],n=x[1],R=S.data.roles[k];
- if(R)return'<li><button class="cp-n" data-go="'+k+'|'+n+'"><span>'+esc(rname(R))+"</span><em>"+t.lvl+" "+n+"</em></button></li>";
+function peek(k,n){var t=T(),R=S.data.roles[k],d=R.lv[n];if(!d)return"";
+ var h='<div class="cp-d cp-pk">';if(L()=="en")h+='<div class="cp-note">'+t.ar_note+"</div>";
+ d.d.forEach(function(p){h+='<p dir="rtl" style="text-align:'+(L()=="en"?"right":"start")+'">'+esc(p)+"</p>"});
+ return h+'<button class="cp-go" data-go="'+k+"|"+n+'">'+t.goto+" ›</button></div>"}
+function ref(x,ctx){var t=T(),k=x[0],n=x[1],R=S.data.roles[k];
+ if(R){var key=ctx+k+"|"+n,on=!!S.pk[key];return'<li><button class="cp-n'+(on?" on":"")+'" data-pk="'+key+'" aria-expanded="'+on+'"><span>'+esc(rname(R))+"</span><em>"+t.lvl+" "+n+"</em></button>"+(on?peek(k,n):"")+"</li>"}
  if(k=="mgmt")return'<li><span class="cp-n p"><span>'+t.mgmt+"</span></span></li>";
  return'<li><span class="cp-n p"><span>'+t[k]+"</span><em>"+t.lvl+" "+n+"</em></span></li>"}
-function grp(label,list){var t=T();return'<div class="cp-g"><span>'+label+'</span><ul class="cp-br cp-s">'+(list.length?list.map(ref).join(""):'<li><span class="cp-n p"><span>'+t.none+"</span></span></li>")+"</ul></div>"}
+function grp(label,list,ctx){var t=T();return'<div class="cp-g"><span>'+label+'</span><ul class="cp-br cp-s">'+(list.length?list.map(function(x){return ref(x,ctx)}).join(""):'<li><span class="cp-n p"><span>'+t.none+"</span></span></li>")+"</ul></div>"}
 function detail(rid){var t=T(),R=S.data.roles[rid],n=S.l,d=R.lv[n];if(!d)return"";
  var h='<div class="cp-d">';
  if(L()=="en")h+='<div class="cp-note">'+t.ar_note+"</div>";
  d.d.forEach(function(p,i){h+='<p class="'+(i==0&&d.d.length>1?"s":"")+'" dir="rtl" style="text-align:'+(L()=="en"?"right":"start")+'">'+esc(p)+"</p>"});
- h+=grp("⬅ "+t.from,d.f)+grp("➡ "+t.next,d.n);
+ h+=grp("⬅ "+t.from,d.f,"f")+grp("➡ "+t.next,d.n,"n");
  if(R.m.length)h+='<div class="cp-g"><span>'+t.mk+'</span><ul class="cp-br cp-s">'+R.m.slice(0,8).map(function(m){return'<li><span class="cp-n p"><span dir="ltr">'+esc(m)+"</span></span></li>"}).join("")+"</ul></div>";
  return h+"</div>"}
 function roleHtml(rid){var t=T(),R=S.data.roles[rid],ls=lvls(R),open=!!S.open[rid],h="";
@@ -88,8 +92,9 @@ function init(){if(S.inited)return;S.inited=true;css();
  $("#cp").addEventListener("click",function(e){var b;
   if(b=e.target.closest("[data-p]"))return select(b.dataset.p);
   if(e.target.closest("[data-close]")){var id=S.p&&S.p.id;S.p=null;S.r=null;S.l=null;draw();hash();var c=id&&$('.cp-card[data-p="'+id+'"]');if(c)window.scrollTo({top:c.getBoundingClientRect().top+window.pageYOffset-80,behavior:"smooth"});return}
-  if(b=e.target.closest("[data-go]")){var a=b.dataset.go.split("|");return go(a[0],+a[1])}
-  if(b=e.target.closest("[data-l]")){var a=b.dataset.l.split("|");if(b.disabled)return;if(S.r==a[0]&&S.l==+a[1]){S.l=null;draw();hash();return}return go(a[0],+a[1])}
+  if(b=e.target.closest("[data-pk]")){var k=b.dataset.pk;S.pk[k]=!S.pk[k];return draw()}
+  if(b=e.target.closest("[data-go]")){S.pk={};var a=b.dataset.go.split("|");return go(a[0],+a[1])}
+  if(b=e.target.closest("[data-l]")){var a=b.dataset.l.split("|");if(b.disabled)return;S.pk={};if(S.r==a[0]&&S.l==+a[1]){S.l=null;draw();hash();return}return go(a[0],+a[1])}
   if(b=e.target.closest("[data-t]")){var x=S.trail[+b.dataset.t];S.trail=S.trail.slice(0,+b.dataset.t+1);return go(x[0],x[1],true)}
   if(e.target.closest("[data-clear]")){S.trail=[];draw();return}
   if(b=e.target.closest("[data-r]")){var r=b.dataset.r;S.open[r]=!S.open[r];if(!S.open[r]&&S.r==r){S.r=null;S.l=null}draw();hash()}});
