@@ -6,10 +6,10 @@ var L=function(){return document.documentElement.lang=="en"?"en":"ar"};
 var U={
 ar:{h:"مسارات الأمن السيبراني",sub:"اختر مسارك، ثم استكشف الأدوار الوظيفية ومستوياتها وكيف تنتقل بينها.",more:"مسارات إضافية",all:"كل المسارات",roles:"أدوار",diff:"الصعوبة",about:"عن الدور",lv:"المستوى",exp:"الخبرة",yrs:"سنة",entry:"بدون خبرة",from:"جاء من",next:"الخطوة التالية",mk:"مسميات شائعة في سوق العمل السعودي",trail:"رحلتك",clear:"مسح",
 src:"الأدوار والمستويات والانتقالات: الإطار السعودي لكوادر الأمن السيبراني (سيوف) – الهيئة الوطنية للأمن السيبراني. المسميات: إعلانات وظيفية سعودية منشورة.",
-grad:"خريج بمؤهل علمي",tech:"أدوار فنية للأمن السيبراني",core:"أدوار رئيسية للأمن السيبراني",mgmt:"أدوار إدارية أو موارد بشرية",lvl:"مستوى",none:"—",ar_note:"",sum:"ملخص الدور",tasks:"المهمات والمسؤوليات"},
+grad:"خريج بمؤهل علمي",tech:"أدوار فنية للأمن السيبراني",core:"أدوار رئيسية للأمن السيبراني",mgmt:"أدوار إدارية أو موارد بشرية",lvl:"المستوى",levels:"مستويات",rng:"المستويات",none:"—",ar_note:"",sum:"ملخص الدور",tasks:"المهمات والمسؤوليات"},
 en:{h:"Cybersecurity Career Paths",sub:"Pick a path, then explore its roles, levels and how to move between them.",more:"More paths",all:"All paths",roles:"roles",diff:"Difficulty",about:"About the role",lv:"Level",exp:"Experience",yrs:"yrs",entry:"Entry",from:"Comes from",next:"Next step",mk:"Common titles in the Saudi job market",trail:"Your journey",clear:"Clear",
 src:"Roles, levels and transitions: Saudi Cybersecurity Workforce Framework (SCyWF) – National Cybersecurity Authority. Titles: public Saudi job postings.",
-grad:"Graduate with academic qualification",tech:"Cybersecurity technical roles",core:"Cybersecurity core roles",mgmt:"Management or other HR roles",lvl:"Level",none:"—",ar_note:"Official description (Arabic)",sum:"Role summary",tasks:"Tasks and responsibilities"}
+grad:"Graduate with academic qualification",tech:"Cybersecurity technical roles",core:"Cybersecurity core roles",mgmt:"Management or other HR roles",lvl:"Level",levels:"levels",rng:"Levels",none:"—",ar_note:"Official description (Arabic)",sum:"Role summary",tasks:"Tasks and responsibilities"}
 };
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 var CSS=".cp{max-width:900px;margin:0 auto}.cp *{box-sizing:border-box}.cp-h h2{margin:0 0 6px}.cp-h p{margin:0 0 18px;color:var(--muted)}"+
@@ -36,7 +36,7 @@ var CSS=".cp{max-width:900px;margin:0 auto}.cp *{box-sizing:border-box}.cp-h h2{
 ".cp-g{margin-top:12px}.cp-g>span{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}.cp-cs{display:flex;flex-wrap:wrap;gap:6px}.cp-c{font:inherit;font-size:12.5px;padding:6px 11px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);text-align:start}"+
 "button.cp-c{cursor:pointer;border-color:var(--accent2)}button.cp-c:hover{background:color-mix(in srgb,var(--accent) 14%,transparent)}.cp-c.p{color:var(--muted);border-style:dashed}"+
 ".cp-m{margin-top:14px}.cp-m span{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}.cp-m i{font-style:normal;font-size:12px;padding:4px 10px;border-radius:99px;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent2);display:inline-block;margin:0 0 6px;margin-inline-end:6px}"+
-".cp-src{margin:28px 0 4px;font-size:12px;color:var(--muted);line-height:1.8}.hero.cp-on .search,.hero.cp-on .orgs,.hero.cp-on .stats{display:none!important}";
+".cp-cnt{flex:none;font-size:12px;color:var(--muted)}.cp-lv{margin-inline-start:6px;padding-inline-start:16px}.cp-lv>li{padding-top:0;margin:0 0 8px}.cp-lv>li::before{top:22px;inset-inline-start:-16px;width:16px}.cp-lb{font:inherit;color:var(--text);width:100%;display:flex;align-items:center;gap:10px;text-align:start;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);cursor:pointer}.cp-lb b{font-size:14px}.cp-lb em{font-style:normal;color:var(--muted);font-size:12px;flex:1}.cp-lb.on{background:var(--accent);border-color:var(--accent);color:#fff}.cp-lb.on em{color:#ffffffcc}.cp-lb.on .cp-ch{border-color:#fff}.cp-s{margin-inline-start:4px;padding-inline-start:14px;padding-top:0}.cp-s>li{padding-top:0;margin:0 0 7px}.cp-s>li::before{top:19px;inset-inline-start:-14px;width:14px}.cp-n{font:inherit;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:start;padding:8px 11px;border-radius:9px;border:1px solid var(--accent2);background:var(--card);color:var(--text);cursor:pointer;font-size:13px}.cp-n em{font-style:normal;color:var(--muted);font-size:12px;flex:none}.cp-n.p{border-style:dashed;border-color:var(--line);color:var(--muted);cursor:default}button.cp-n:hover{background:color-mix(in srgb,var(--accent) 12%,var(--card))}.cp-d{margin:8px 0 2px;padding:12px}.cp-src{margin:28px 0 4px;font-size:12px;color:var(--muted);line-height:1.8}.hero.cp-on .search,.hero.cp-on .orgs,.hero.cp-on .stats{display:none!important}";
 function css(){if(!$("#cp-css")){var s=document.createElement("style");s.id="cp-css";s.textContent=CSS;document.head.appendChild(s)}}
 function T(){return U[L()]}
 function pname(p){return L()=="ar"?p.ar:p.en}
@@ -46,24 +46,22 @@ function pathOf(rid,pref){var P=S.data.paths;if(pref&&pref.roles.indexOf(rid)>-1
 function lvls(r){return Object.keys(r.lv).map(Number).sort()}
 function expTxt(n){var e=S.data.exp[n];return e=="0"?T().entry:e+" "+T().yrs}
 function ref(x){var t=T(),k=x[0],n=x[1],R=S.data.roles[k];
- if(R){return'<button class="cp-c" data-go="'+k+'|'+n+'">'+esc(rname(R))+" · "+t.lvl+" "+n+"</button>"}
- if(k=="mgmt")return'<span class="cp-c p">'+t.mgmt+"</span>";
- return'<span class="cp-c p">'+t[k]+" · "+t.lvl+" "+n+"</span>"}
+ if(R)return'<li><button class="cp-n" data-go="'+k+'|'+n+'"><span>'+esc(rname(R))+"</span><em>"+t.lvl+" "+n+"</em></button></li>";
+ if(k=="mgmt")return'<li><span class="cp-n p"><span>'+t.mgmt+"</span></span></li>";
+ return'<li><span class="cp-n p"><span>'+t[k]+"</span><em>"+t.lvl+" "+n+"</em></span></li>"}
+function grp(label,list){var t=T();return'<div class="cp-g"><span>'+label+'</span><ul class="cp-br cp-s">'+(list.length?list.map(ref).join(""):'<li><span class="cp-n p"><span>'+t.none+"</span></span></li>")+"</ul></div>"}
 function detail(rid){var t=T(),R=S.data.roles[rid],n=S.l,d=R.lv[n];if(!d)return"";
- var h='<div class="cp-d"><h4>'+esc(rname(R))+" · "+t.lvl+" "+n+" · "+t.exp+": "+expTxt(n)+"</h4>";
+ var h='<div class="cp-d">';
  if(L()=="en")h+='<div class="cp-note">'+t.ar_note+"</div>";
  d.d.forEach(function(p,i){h+='<p class="'+(i==0&&d.d.length>1?"s":"")+'" dir="rtl" style="text-align:'+(L()=="en"?"right":"start")+'">'+esc(p)+"</p>"});
- var f=d.f.length?d.f.map(ref).join(""):'<span class="cp-c p">'+t.none+"</span>",x=d.n.length?d.n.map(ref).join(""):'<span class="cp-c p">'+t.none+"</span>";
- h+='<div class="cp-g"><span>⬅ '+t.from+'</span><div class="cp-cs">'+f+'</div></div><div class="cp-g"><span>➡ '+t.next+'</span><div class="cp-cs">'+x+"</div></div>";
- if(R.m.length)h+='<div class="cp-m"><span>'+t.mk+"</span>"+R.m.slice(0,8).map(function(m){return"<i>"+esc(m)+"</i>"}).join("")+"</div>";
+ h+=grp("⬅ "+t.from,d.f)+grp("➡ "+t.next,d.n);
+ if(R.m.length)h+='<div class="cp-g"><span>'+t.mk+'</span><ul class="cp-br cp-s">'+R.m.slice(0,8).map(function(m){return'<li><span class="cp-n p"><span dir="ltr">'+esc(m)+"</span></span></li>"}).join("")+"</ul></div>";
  return h+"</div>"}
 function roleHtml(rid){var t=T(),R=S.data.roles[rid],ls=lvls(R),open=!!S.open[rid],h="";
- h+='<li><div class="cp-role'+(open?" open":"")+'" id="r-'+rid+'"><button class="cp-rh" data-r="'+rid+'" aria-expanded="'+open+'"><div><b>'+esc(R.ar)+"</b><small>"+esc(R.en)+'</small></div><span class="cp-dots">';
- for(var i=1;i<=5;i++)h+='<i class="'+(ls.indexOf(i)>-1?"y":"")+'"></i>';
- h+='</span><span class="cp-ch"></span></button><div class="cp-rb">';
- if(open){h+='<div class="cp-intro">'+(L()=="en"?'<div class="cp-note">'+t.ar_note+"</div>":"")+'<span dir="rtl">'+esc(R.intro||"")+"</span></div>";
-  h+='<div class="cp-lad">';for(var n=1;n<=5;n++){var has=ls.indexOf(n)>-1;h+='<button class="cp-l'+(S.r==rid&&S.l==n?" on":"")+'" data-l="'+rid+"|"+n+'"'+(has?"":" disabled")+"><b>L"+n+"</b><small>"+expTxt(n)+"</small></button>"}
-  h+="</div>";if(S.r==rid&&S.l)h+=detail(rid)}
+ h+='<li><div class="cp-role'+(open?" open":"")+'" id="r-'+rid+'"><button class="cp-rh" data-r="'+rid+'" aria-expanded="'+open+'"><div><b>'+esc(R.ar)+"</b><small>"+esc(R.en)+'</small></div><span class="cp-cnt">'+ls.length+" "+t.levels+'</span><span class="cp-ch"></span></button><div class="cp-rb">';
+ if(open){h+='<div class="cp-intro">'+(L()=="en"?'<div class="cp-note">'+t.ar_note+"</div>":"")+'<span dir="rtl">'+esc(R.intro||"")+'</span></div><ul class="cp-br cp-lv">';
+  ls.forEach(function(n){var on=S.r==rid&&S.l==n;h+='<li><button class="cp-lb'+(on?" on":"")+'" data-l="'+rid+"|"+n+'" aria-expanded="'+on+'"><b>'+t.lvl+" "+n+"</b><em>"+expTxt(n)+'</em><i class="cp-ch"></i></button>'+(on?detail(rid):"")+"</li>"});
+  h+="</ul>"}
  return h+"</div></div></li>"}
 function trailHtml(){var t=T();if(!S.trail.length)return"";var h='<div class="cp-trail"><span>'+t.trail+"</span>";
  S.trail.forEach(function(x,i){var R=S.data.roles[x[0]];h+='<button class="cp-t'+(i==S.trail.length-1?" on":"")+'" data-t="'+i+'">'+esc(rname(R))+" · "+x[1]+"</button>"});
@@ -71,9 +69,10 @@ function trailHtml(){var t=T();if(!S.trail.length)return"";var h='<div class="cp
 function cols(){return window.matchMedia("(min-width:800px)").matches?3:2}
 function tree(){var t=T(),p=S.p;
  return'<div class="cp-open">'+trailHtml()+'<button class="cp-root" data-close="1" aria-expanded="true">'+p.ico+" "+esc(pname(p))+'<span class="cp-x2">✕</span></button><ul class="cp-br">'+p.roles.map(roleHtml).join("")+"</ul></div>"}
+function rg(p){var a=[];p.roles.forEach(function(r){lvls(S.data.roles[r]).forEach(function(n){a.push(n)})});return Math.min.apply(null,a)+"–"+Math.max.apply(null,a)}
 function group(list,cls){var t=T(),c=cols(),k=-1,h="";
  list.forEach(function(p,i){if(S.p&&S.p.id==p.id)k=i});var end=k<0?-1:Math.min(list.length-1,k-k%c+c-1);
- list.forEach(function(p,i){h+='<button class="cp-card'+(k==i?" sel":"")+'" data-p="'+p.id+'" aria-expanded="'+(k==i)+'"><span class="e">'+p.ico+"</span><b>"+esc(pname(p))+"</b>"+stars(p.st)+"<i>"+p.roles.length+" "+t.roles+"</i></button>";if(i==end)h+=tree()});
+ list.forEach(function(p,i){h+='<button class="cp-card'+(k==i?" sel":"")+'" data-p="'+p.id+'" aria-expanded="'+(k==i)+'"><span class="e">'+p.ico+"</span><b>"+esc(pname(p))+"</b>"+"<i>"+p.roles.length+" "+t.roles+" · "+t.rng+" "+rg(p)+"</i></button>";if(i==end)h+=tree()});
  return'<div class="cp-grid '+cls+'">'+h+"</div>"}
 function home(){var t=T(),P=S.data.paths;
  return'<div class="cp"><div class="cp-h"><h2>'+t.h+"</h2><p>"+t.sub+"</p></div>"+group(P.filter(function(p){return!p.x}),"")+'<h3 class="cp-sub">'+t.more+"</h3>"+group(P.filter(function(p){return p.x}),"cp-x")+"</div>"}
