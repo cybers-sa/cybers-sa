@@ -89,7 +89,7 @@ function init(){if(S.inited)return;S.inited=true;css();
   if(b=e.target.closest("[data-p]"))return select(b.dataset.p);
   if(e.target.closest("[data-close]")){var id=S.p&&S.p.id;S.p=null;S.r=null;S.l=null;draw();hash();var c=id&&$('.cp-card[data-p="'+id+'"]');if(c)window.scrollTo({top:c.getBoundingClientRect().top+window.pageYOffset-80,behavior:"smooth"});return}
   if(b=e.target.closest("[data-go]")){var a=b.dataset.go.split("|");return go(a[0],+a[1])}
-  if(b=e.target.closest("[data-l]")){var a=b.dataset.l.split("|");if(b.disabled)return;return go(a[0],+a[1])}
+  if(b=e.target.closest("[data-l]")){var a=b.dataset.l.split("|");if(b.disabled)return;if(S.r==a[0]&&S.l==+a[1]){S.l=null;draw();hash();return}return go(a[0],+a[1])}
   if(b=e.target.closest("[data-t]")){var x=S.trail[+b.dataset.t];S.trail=S.trail.slice(0,+b.dataset.t+1);return go(x[0],x[1],true)}
   if(e.target.closest("[data-clear]")){S.trail=[];draw();return}
   if(b=e.target.closest("[data-r]")){var r=b.dataset.r;S.open[r]=!S.open[r];if(!S.open[r]&&S.r==r){S.r=null;S.l=null}draw();hash()}});
