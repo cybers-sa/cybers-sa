@@ -16,7 +16,7 @@ var CSS=".cp{max-width:900px;margin:0 auto}.cp *{box-sizing:border-box}.cp-h h2{
 ".cp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(min-width:800px){.cp-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}}"+
 ".cp-card{font:inherit;color:var(--text);text-align:start;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px;cursor:pointer;transition:.18s;min-width:0}.cp-card:hover{transform:translateY(-3px);border-color:var(--accent)}"+
 ".cp-card .e{font-size:28px;line-height:1}.cp-card b{font-size:15px;line-height:1.4}.cp-card small{color:var(--muted);font-size:12.5px;line-height:1.5}.cp-card i{font-style:normal;font-size:12px;color:var(--accent2);margin-top:auto}"+
-".cp-st{color:#f5a524;letter-spacing:1px;font-size:13px}.cp-st s{text-decoration:none;color:var(--line)}"+
+".cp-sr{display:flex;align-items:center;gap:6px}.cp-lbl{font-size:12px;color:var(--muted)}.cp-st{color:#f5a524;letter-spacing:1px;font-size:13px}.cp-st s{text-decoration:none;color:var(--line)}"+
 ".cp-sub{margin:26px 0 10px;font-size:16px;color:var(--muted)}.cp-x .cp-card{padding:11px}.cp-x .e{font-size:22px}.cp-x b{font-size:13.5px}"+
 ".cp-back{font:inherit;background:none;border:0;color:var(--accent2);cursor:pointer;padding:6px 0;font-size:14px}"+
 ".cp-ph{display:flex;gap:12px;align-items:center;margin:6px 0 14px}.cp-ph .e{font-size:40px;line-height:1}.cp-ph h2{margin:0;font-size:22px;line-height:1.3}.cp-ph small{color:var(--muted)}"+
@@ -41,7 +41,7 @@ function css(){if(!$("#cp-css")){var s=document.createElement("style");s.id="cp-
 function T(){return U[L()]}
 function pname(p){return L()=="ar"?p.ar:p.en}
 function rname(r){return L()=="ar"?r.ar:r.en}
-function stars(n){var o="";for(var i=1;i<=4;i++)o+=i<=n?"★":"<s>★</s>";return'<span class="cp-st" role="img" aria-label="'+T().diff+": "+n+'/4">'+o+"</span>"}
+function stars(n){var o="";for(var i=1;i<=4;i++)o+=i<=n?"★":"<s>★</s>";return'<span class="cp-sr"><span class="cp-lbl">'+T().diff+'</span> <span class="cp-st" role="img" aria-label="'+T().diff+": "+n+'/4">'+o+"</span></span>"}
 function pathOf(rid,pref){var P=S.data.paths;if(pref&&pref.roles.indexOf(rid)>-1)return pref;for(var i=0;i<P.length;i++)if(P[i].roles.indexOf(rid)>-1)return P[i];return null}
 function lvls(r){return Object.keys(r.lv).map(Number).sort()}
 function expTxt(n){var e=S.data.exp[n];return e=="0"?T().entry:e+" "+T().yrs}
@@ -73,7 +73,7 @@ function tree(){var t=T(),p=S.p;
  return'<div class="cp-open">'+trailHtml()+'<button class="cp-root" data-close="1" aria-expanded="true">'+p.ico+" "+esc(pname(p))+'<span class="cp-x2">✕</span></button><ul class="cp-br">'+p.roles.map(roleHtml).join("")+"</ul></div>"}
 function group(list,cls){var t=T(),c=cols(),k=-1,h="";
  list.forEach(function(p,i){if(S.p&&S.p.id==p.id)k=i});var end=k<0?-1:Math.min(list.length-1,k-k%c+c-1);
- list.forEach(function(p,i){h+='<button class="cp-card'+(k==i?" sel":"")+'" data-p="'+p.id+'" aria-expanded="'+(k==i)+'"><span class="e">'+p.ico+"</span><b>"+esc(pname(p))+"</b>"+stars(p.st)+"<small>"+esc(L()=="ar"?p.fa:p.fe)+"</small><i>"+p.roles.length+" "+t.roles+"</i></button>";if(i==end)h+=tree()});
+ list.forEach(function(p,i){h+='<button class="cp-card'+(k==i?" sel":"")+'" data-p="'+p.id+'" aria-expanded="'+(k==i)+'"><span class="e">'+p.ico+"</span><b>"+esc(pname(p))+"</b>"+stars(p.st)+"<i>"+p.roles.length+" "+t.roles+"</i></button>";if(i==end)h+=tree()});
  return'<div class="cp-grid '+cls+'">'+h+"</div>"}
 function home(){var t=T(),P=S.data.paths;
  return'<div class="cp"><div class="cp-h"><h2>'+t.h+"</h2><p>"+t.sub+"</p></div>"+group(P.filter(function(p){return!p.x}),"")+'<h3 class="cp-sub">'+t.more+"</h3>"+group(P.filter(function(p){return p.x}),"cp-x")+"</div>"}
