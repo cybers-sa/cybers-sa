@@ -220,7 +220,7 @@ function list(){
 function stats(){const t=T[lang],vis=D.filter(e=>st(e)!="ended"||e.keep),jv=JD.filter(j=>jst(j)!="ended");
  $("#stats").innerHTML=view=="cp"||view=="ct"?"":view=="ev"?["ev","bc","cr","ws","pg"].map(k=>`<div><b>${vis.filter(x=>x.type==k).length}</b><span>${t[k]}</span></div>`).join(""):["full","part","intern","tte","contract"].map(k=>`<div><b>${jv.filter(x=>x.kind==k).length}</b><span>${t["k_"+k]}</span></div>`).join("")}
 function setView(v){view=v;$("#events").style.display=v=="ev"?"":"none";$("#jobs").style.display=v=="jb"?"":"none";$("#paths").style.display=v=="cp"?"":"none";$("#certs").style.display=v=="ct"?"":"none";if(window.CP&&v!="cp")CP.close();if(window.CT&&v!="ct")CT.close();
- if(v=="cp"||v=="ct"){const M=v=="cp"?"CP":"CT";if(window[M])window[M].open();else{const sc=document.createElement("script");sc.src=(v=="cp"?"/paths.js":"/certs.js")+"?v=2";sc.onload=()=>window[M].open();document.head.appendChild(sc)}}
+ if(v=="cp"||v=="ct"){const M=v=="cp"?"CP":"CT";if(window[M])window[M].open();else{const sc=document.createElement("script");sc.src=(v=="cp"?"/paths.js":"/certs.js")+"?v=3";sc.onload=()=>window[M].open();document.head.appendChild(sc)}}
  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.v==v));
  $("#browse").href=v=="ev"?"#events":"#jobs";$("#q").placeholder=v=="ev"?T[lang].ph:T[lang].phj;stats()}
 document.addEventListener("click",e=>{const b=e.target.closest("#tabs button,.links a[data-v]");if(!b)return;e.preventDefault();if((b.dataset.v=="cp"||b.dataset.v=="ct")&&view!=b.dataset.v)track(b.dataset.v);setView(b.dataset.v);

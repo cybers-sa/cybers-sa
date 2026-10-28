@@ -108,7 +108,7 @@ function init(){if(S.inited)return;S.inited=true;css();
 var rz;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){if(S.data&&$("#paths").style.display!="none"&&S.cols!=cols()){S.cols=cols();draw()}},150)});
 window.CP={open:function(){var el=$("#cp");if(!el)return;document.querySelector(".hero").classList.add("cp-on");
   if(S.data){draw();return}
-  fetch("/paths.json?v=2").then(function(r){return r.json()}).then(function(d){S.data=d;init();draw()}).catch(function(){el.innerHTML='<p style="color:var(--muted)">⚠</p>'})},
+  fetch("/paths.json?v=3").then(function(r){return r.json()}).then(function(d){S.data=d;init();draw()}).catch(function(){el.innerHTML='<p style="color:var(--muted)">⚠</p>'})},
  close:function(){var h=document.querySelector(".hero");if(h)h.classList.remove("cp-on")},
  render:function(){if(S.data&&$("#paths").style.display!="none")draw()}};
 })();
