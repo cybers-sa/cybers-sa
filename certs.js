@@ -5,9 +5,9 @@ var $=function(s){return document.querySelector(s)};
 var L=function(){return document.documentElement.lang=="en"?"en":"ar"};
 var U={
 ar:{h:"خريطة الشهادات المهنية",sub:"اختر المسار وشاهد الشهادات المناسبة من الأساسيات حتى الاحتراف. اضغط على أي شهادة لتعرف عنها أكثر.",all:"كل المسارات",ph:"ابحث عن شهادة أو جهة",
- b:"مبتدئ",i:"متوسط",a:"متقدم",bd:"الأساسيات والدخول للمجال",id:"ممارسة عملية وتخصص",ad:"خبرة متقدمة وقيادة تقنية",cnt:"شهادة",open:"الصفحة الرسمية",more:"التفاصيل",back:"رجوع",none:"لا توجد شهادات مطابقة",issuer:"الجهة المانحة",level:"المستوى",gen:"مناسبة لجميع المسارات"},
+ b:"مبتدئ",i:"متوسط",a:"متقدم",bd:"الأساسيات والدخول للمجال",id:"ممارسة عملية وتخصص",ad:"خبرة متقدمة وقيادة تقنية",cnt:"شهادة",open:"الصفحة الرسمية",more:"التفاصيل",back:"إغلاق",none:"لا توجد شهادات مطابقة",issuer:"الجهة المانحة",level:"المستوى",gen:"مناسبة لجميع المسارات"},
 en:{h:"Professional Certification Roadmap",sub:"Pick a path and see suitable certifications from the basics to expert level. Tap any certification to learn more.",all:"All paths",ph:"Search certification or issuer",
- b:"Beginner",i:"Intermediate",a:"Advanced",bd:"Fundamentals and entry to the field",id:"Hands-on practice and specialization",ad:"Advanced expertise and technical leadership",cnt:"certifications",open:"Official page",more:"Details",back:"Back",none:"No matching certifications",issuer:"Issuer",level:"Level",gen:"Suitable for all paths"}
+ b:"Beginner",i:"Intermediate",a:"Advanced",bd:"Fundamentals and entry to the field",id:"Hands-on practice and specialization",ad:"Advanced expertise and technical leadership",cnt:"certifications",open:"Official page",more:"Details",back:"Close",none:"No matching certifications",issuer:"Issuer",level:"Level",gen:"Suitable for all paths"}
 };
 var CSS=".ct{max-width:980px;margin:0 auto}.ct *{box-sizing:border-box}.ct h2{margin:0 0 6px}.ct-sub{margin:0 0 18px;color:var(--muted);line-height:1.8}"+
 ".ct-q{width:100%;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;margin-bottom:12px}.ct-q:focus{outline:2px solid var(--accent2);outline-offset:1px}"+
@@ -21,7 +21,7 @@ var CSS=".ct{max-width:980px;margin:0 auto}.ct *{box-sizing:border-box}.ct h2{ma
 ".ct-c{display:flex;flex-direction:column;gap:5px;min-width:0;padding:13px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);color:var(--text);transition:.18s;border-top:3px solid var(--c);cursor:pointer;text-align:start;font:inherit}.ct-c:hover{transform:translateY(-3px);border-color:var(--c)}"+
 ".ct-is{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}.ct-is::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--c)}"+
 ".ct-ac{font-size:17px;font-weight:700;line-height:1.3;overflow-wrap:anywhere;direction:ltr;text-align:start}.ct-nm{font-size:12.5px;color:var(--muted);line-height:1.5;direction:ltr;text-align:start;overflow-wrap:anywhere}.ct-go{margin-top:auto;padding-top:6px;font-size:12px;color:var(--accent2)}"+
-".ct-c.big{grid-column:1/-1;cursor:default;transform:none;border-color:var(--c);padding:16px}.ct-c.big .ct-ac{font-size:20px}.ct-c.big .ct-nm{font-size:13.5px}"+
+".ct-hdr{cursor:pointer;display:flex;flex-direction:column;gap:5px}.ct-hdr .ct-go{padding-top:0;margin-top:2px}.ct-c.big{grid-column:1/-1;cursor:default;transform:none;border-color:var(--c);padding:16px}.ct-c.big .ct-ac{font-size:20px}.ct-c.big .ct-nm{font-size:13.5px}"+
 ".ct-d{margin:10px 0 4px;font-size:14.5px;line-height:1.9;color:var(--text)}.ct-meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted);margin:2px 0 12px}.ct-meta b{color:var(--text);font-weight:600}"+
 ".ct-act{display:flex;flex-wrap:wrap;gap:8px}.ct-btn{font:inherit;font-size:14px;text-decoration:none;color:#fff;background:var(--accent);border:0;border-radius:10px;padding:9px 16px;cursor:pointer}.ct-bk{font:inherit;font-size:14px;color:var(--text);background:none;border:1px solid var(--line);border-radius:10px;padding:9px 16px;cursor:pointer}"+
 ".ct-e{color:var(--muted);padding:6px 0 4px;font-size:14px}"+
@@ -32,7 +32,7 @@ function T(){return U[L()]}
 var COL={b:"#2fb67c",i:"#4f6bed",a:"#8a4fe0"};
 function card(c,k){var t=T(),on=S.c==c.a;
  if(!on)return'<div class="ct-c" style="--c:'+COL[k]+'" role="button" tabindex="0" data-c="'+esc(c.a)+'"><span class="ct-is">'+esc(c.i)+'</span><span class="ct-ac">'+esc(c.a)+'</span><span class="ct-nm">'+esc(c.n)+'</span><span class="ct-go">'+t.more+" ‹</span></div>";
- return'<div class="ct-c big" style="--c:'+COL[k]+'"><span class="ct-is">'+esc(c.i)+'</span><span class="ct-ac">'+esc(c.a)+'</span><span class="ct-nm">'+esc(c.n)+'</span><p class="ct-d">'+esc(L()=="ar"?c.d:c.e)+'</p><div class="ct-meta"><span>'+t.issuer+": <b>"+esc(c.i)+"</b></span><span>"+t.level+": <b>"+t[k]+"</b></span>"+(c.p.indexOf("*")>-1?"<span>"+t.gen+"</span>":"")+
+ return'<div class="ct-c big" style="--c:'+COL[k]+'"><div class="ct-hdr" role="button" tabindex="0" data-c="'+esc(c.a)+'"><span class="ct-is">'+esc(c.i)+'</span><span class="ct-ac">'+esc(c.a)+'</span><span class="ct-nm">'+esc(c.n)+'</span><span class="ct-go">'+t.back+' ▴</span></div><p class="ct-d">'+esc(L()=="ar"?c.d:c.e)+'</p><div class="ct-meta"><span>'+t.issuer+": <b>"+esc(c.i)+"</b></span><span>"+t.level+": <b>"+t[k]+"</b></span>"+(c.p.indexOf("*")>-1?"<span>"+t.gen+"</span>":"")+
  '</div><div class="ct-act"><a class="ct-btn" href="'+esc(c.u)+'" target="_blank" rel="noopener noreferrer">'+t.open+' ↗</a><button class="ct-bk" data-bk="1">'+t.back+"</button></div></div>"}
 function match(c){var q=S.q.trim().toLowerCase();if(S.p!="all"&&c.p.indexOf("*")<0&&c.p.indexOf(S.p)<0)return false;return!q||(c.a+" "+c.n+" "+c.i).toLowerCase().indexOf(q)>-1}
 function draw(){if(!S.d)return;var t=T(),P=S.d.paths;
@@ -50,8 +50,8 @@ function init(){if(S.inited)return;S.inited=true;css();
   if(b=e.target.closest("[data-p]")){S.p=b.dataset.p;S.c=null;draw();hash();return}
   if(e.target.closest("[data-bk]")){S.c=null;draw();return}
   if(e.target.closest("a"))return;
-  if(b=e.target.closest("[data-c]")){S.c=b.dataset.c;draw();var o=$(".ct-c.big");if(o)o.scrollIntoView({block:"nearest",behavior:"smooth"})}});
- $("#ct").addEventListener("keydown",function(e){if(e.key=="Enter"){var b=e.target.closest("[data-c]");if(b){S.c=b.dataset.c;draw()}}});
+  if(b=e.target.closest("[data-c]")){if(S.c==b.dataset.c){S.c=null;draw();return}S.c=b.dataset.c;draw();var o=$(".ct-c.big");if(o)o.scrollIntoView({block:"nearest",behavior:"smooth"})}});
+ $("#ct").addEventListener("keydown",function(e){if(e.key=="Enter"){var b=e.target.closest("[data-c]");if(b){S.c=S.c==b.dataset.c?null:b.dataset.c;draw()}}});
  $("#ct").addEventListener("input",function(e){if(e.target.id=="ct-q"){S.q=e.target.value;S.c=null;draw()}});
  var h=location.hash.replace(/^#certs\/?/,"");if(h&&S.d.paths.some(function(p){return p.id==h}))S.p=h}
 window.CT={open:function(){var el=$("#ct");if(!el)return;document.querySelector(".hero").classList.add("cp-on");
