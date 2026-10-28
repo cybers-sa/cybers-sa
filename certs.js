@@ -44,7 +44,7 @@ function draw(){if(!S.d)return;var t=T(),P=S.d.paths;
  $("#ct").innerHTML='<div class="ct"><h2>'+t.h+'</h2><p class="ct-sub">'+t.sub+'</p><input class="ct-q" id="ct-q" type="search" placeholder="'+t.ph+'" value="'+esc(S.q)+'" autocomplete="off"><div class="ct-pills" id="ct-pills">'+pills+"</div>"+lanes+"</div>";
  if(keep){var q=$("#ct-q");q.focus();q.setSelectionRange(q.value.length,q.value.length)}
  var on=$(".ct-pill.on");if(on&&!keep&&window.innerWidth<800)try{on.parentNode.scrollTo({left:on.offsetLeft-20,behavior:"auto"})}catch(e){}}
-function hash(){try{history.replaceState(null,"",location.pathname+location.search+"#certs"+(S.p=="all"?"":"/"+S.p))}catch(e){}}
+function hash(){try{history.replaceState(null,"","/certs"+(S.p=="all"?"":"#"+S.p))}catch(e){}}
 function init(){if(S.inited)return;S.inited=true;css();if(!$("#ctd")){var dg=document.createElement("dialog");dg.id="ctd";dg.innerHTML='<div id="ctb"></div>';document.body.appendChild(dg);dg.addEventListener("click",function(e){var r=dg.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dg.close()})}
  $("#ct").addEventListener("click",function(e){var b;
   if(b=e.target.closest("[data-p]")){S.p=b.dataset.p;S.c=null;draw();hash();return}
@@ -53,7 +53,7 @@ function init(){if(S.inited)return;S.inited=true;css();if(!$("#ctd")){var dg=doc
   if(b=e.target.closest("[data-c]"))openCert(b.dataset.c)});
  $("#ct").addEventListener("keydown",function(e){if(e.key=="Enter"){var b=e.target.closest("[data-c]");if(b)openCert(b.dataset.c)}});
  $("#ct").addEventListener("input",function(e){if(e.target.id=="ct-q"){S.q=e.target.value;S.c=null;draw()}});
- var h=location.hash.replace(/^#certs\/?/,"");if(h&&S.d.paths.some(function(p){return p.id==h}))S.p=h}
+ var h=location.hash.replace(/^#(certs)?\/?/,"");if(h&&S.d.paths.some(function(p){return p.id==h}))S.p=h}
 window.CT={open:function(){var el=$("#ct");if(!el)return;document.querySelector(".hero").classList.add("cp-on");
   if(S.d){draw();return}
   Promise.all([fetch("/paths.json?v=3").then(function(r){return r.json()}),fetch("/api/certs").then(function(r){if(!r.ok)throw 0;return r.json()}).catch(function(){return null})]).then(function(a){S.d=a[0];if(a[1])S.d.certs=a[1];init();draw()}).catch(function(){el.innerHTML='<p style="color:var(--muted)">⚠</p>'})},

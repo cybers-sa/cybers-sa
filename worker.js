@@ -243,6 +243,24 @@ async function eventPage(request, env, id) {
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...SEC } });
 }
 
+// صفحتا المسارات والشهادات: عنوان ووصف مستقلان للمعاينة
+const VIEW_META = {
+  '/certs': ['خريطة الشهادات المهنية | سايبرز', 'الشهادات المهنية في الأمن السيبراني مرتبة حسب المسار والمستوى'],
+  '/paths': ['المسارات الوظيفية في الأمن السيبراني | سايبرز', 'المسارات الوظيفية والأدوار والمستويات وفق الإطار السعودي للقوى العاملة في الأمن السيبراني']
+};
+async function viewPage(request, env, p) {
+  const url = new URL(request.url);
+  let html = await (await env.ASSETS.fetch(new Request(url.origin + '/'))).text();
+  const [title, desc] = VIEW_META[p].map(attr), page = attr(url.origin + p);
+  html = html.replace(/<title>.*?<\/title>/s, () => `<title>${title}</title>`)
+    .replace(/<meta name="description" content="[^"]*">/, () => `<meta name="description" content="${desc}">`)
+    .replace(/<meta property="og:title" content="[^"]*">/, () => `<meta property="og:title" content="${title}">`)
+    .replace(/<meta property="og:description" content="[^"]*">/, () => `<meta property="og:description" content="${desc}">`)
+    .replace(/<meta property="og:url" content="[^"]*">/, () => `<meta property="og:url" content="${page}">`)
+    .replace(/<link rel="canonical" href="[^"]*">/, () => `<link rel="canonical" href="${page}">`);
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...SEC } });
+}
+
 // ---------- الوظائف وطلبات التقديم ----------
 const JOB_SQL = "CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, title_ar TEXT, title_en TEXT, org TEXT, city TEXT, mode TEXT, kind TEXT, desc_ar TEXT, desc_en TEXT, questions TEXT DEFAULT '[]', deadline TEXT DEFAULT '', closed INTEGER DEFAULT 0, published INTEGER DEFAULT 1, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
 const APP_SQL = "CREATE TABLE IF NOT EXISTS applications (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, job_title TEXT, name TEXT, email TEXT, phone TEXT, linkedin TEXT, years REAL, answers TEXT DEFAULT '[]', cv_name TEXT, cv_type TEXT, cv_size INTEGER, status TEXT DEFAULT 'new', note TEXT DEFAULT '', ip_hash TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
@@ -562,6 +580,7 @@ async function adminCerts(request, env, id) {
 export default {
   async fetch(request, env) {
     const p = new URL(request.url).pathname, m = request.method;
+    if (m === 'GET' && (p === '/paths' || p === '/certs')) return viewPage(request, env, p);
     if (p === '/api/events' && m === 'GET') return publicEvents(env);
     if (m === 'GET' && /^\/e\/\d+$/.test(p)) return eventPage(request, env, p.split('/')[2]);
     if (m === 'GET' && /^\/j\/\d+$/.test(p)) return jobPage(request, env, p.split('/')[2]);

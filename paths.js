@@ -85,7 +85,7 @@ function group(list,cls){var t=T(),c=cols(),k=-1,h="";
  return'<div class="cp-grid '+cls+'">'+h+"</div>"}
 function home(){var t=T(),P=S.data.paths;
  return'<div class="cp"><div class="cp-h"><h2>'+t.h+"</h2><p>"+t.sub+"</p></div>"+group(P.filter(function(p){return!p.x}),"")+'<h3 class="cp-sub">'+t.more+"</h3>"+group(P.filter(function(p){return p.x}),"cp-x")+"</div>"}
-function hash(){var h="#paths";if(S.p){h+="/"+S.p.id;if(S.r){h+="/"+S.r;if(S.l)h+="/"+S.l}}try{history.replaceState(null,"",location.pathname+location.search+h)}catch(e){}}
+function hash(){var h="";if(S.p){h+="#"+S.p.id;if(S.r){h+="/"+S.r;if(S.l)h+="/"+S.l}}try{history.replaceState(null,"","/paths"+h)}catch(e){}}
 function draw(){if(!S.data)return;$("#cp").innerHTML=home()}
 function select(pid){var same=S.p&&S.p.id==pid;S.r=null;S.l=null;S.open={};
  if(same){S.p=null}else{S.p=S.data.paths.filter(function(p){return p.id==pid})[0]||null;try{track("cpo",pid)}catch(e){}if(S.p&&S.p.roles.length==1)S.open[S.p.roles[0]]=true}
@@ -103,7 +103,7 @@ function init(){if(S.inited)return;S.inited=true;css();
   if(b=e.target.closest("[data-t]")){var x=S.trail[+b.dataset.t];S.trail=S.trail.slice(0,+b.dataset.t+1);return go(x[0],x[1],true)}
   if(e.target.closest("[data-clear]")){S.trail=[];draw();return}
   if(b=e.target.closest("[data-r]")){var r=b.dataset.r;S.open[r]=!S.open[r];if(!S.open[r]&&S.r==r){S.r=null;S.l=null}draw();hash()}});
- var h=location.hash.replace(/^#paths\/?/,"").split("/").filter(Boolean);
+ var h=location.hash.replace(/^#(paths)?\/?/,"").split("/").filter(Boolean);
  if(h[0]){S.p=S.data.paths.filter(function(p){return p.id==h[0]})[0]||null;if(S.p&&h[1]&&S.data.roles[h[1]]){S.open[h[1]]=true;S.r=h[1];if(h[2]&&S.data.roles[h[1]].lv[h[2]]){S.l=+h[2];S.trail=[[h[1],S.l]]}}}}
 var rz;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){if(S.data&&$("#paths").style.display!="none"&&S.cols!=cols()){S.cols=cols();draw()}},150)});
 window.CP={open:function(){var el=$("#cp");if(!el)return;document.querySelector(".hero").classList.add("cp-on");
