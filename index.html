@@ -221,7 +221,7 @@ function stats(){const t=T[lang],vis=D.filter(e=>st(e)!="ended"||e.keep),jv=JD.f
 function setView(v){view=v;$("#events").style.display=v=="ev"?"":"none";$("#jobs").style.display=v=="jb"?"":"none";$("#paths").style.display=v=="cp"?"":"none";if(window.CP&&v!="cp")CP.close();if(v=="cp"){if(window.CP)CP.open();else{const sc=document.createElement("script");sc.src="/paths.js?v=1";sc.onload=()=>CP.open();document.head.appendChild(sc)}}
  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.v==v));
  $("#browse").href=v=="ev"?"#events":"#jobs";$("#q").placeholder=v=="ev"?T[lang].ph:T[lang].phj;stats()}
-document.addEventListener("click",e=>{const b=e.target.closest("#tabs button,.links a[data-v]");if(!b)return;e.preventDefault();setView(b.dataset.v);
+document.addEventListener("click",e=>{const b=e.target.closest("#tabs button,.links a[data-v]");if(!b)return;e.preventDefault();if(b.dataset.v=="cp"&&view!="cp")track("cp");setView(b.dataset.v);
  if(!location.pathname.startsWith("/e/"))history.replaceState(null,"",b.dataset.v=="jb"?"/#jobs":b.dataset.v=="cp"?"/#paths":"/");
  if(b.closest(".links"))$("#"+(b.dataset.v=="jb"?"jobs":"events")).scrollIntoView()});
 $("#lang").onclick=()=>{lang=lang=="ar"?"en":"ar";render()};
@@ -329,7 +329,7 @@ async function nextStep(){const t=T[lang],n=asteps();grab();const d=AP.d,bad=m=>
 $("#evb").addEventListener("click",e=>{const m=location.pathname.match(/^\/e\/(\d+)/);if(m&&e.target.closest("a.btn.p"))track("reg",m[1])});
 $("#jd").addEventListener("click",e=>{const m=location.pathname.match(/^\/j\/(\d+)/);if(m&&e.target.closest("a.btn.p"))track("jx",m[1])});
 let qtm;$("#q").addEventListener("input",()=>{clearTimeout(qtm);qtm=setTimeout(()=>{const v=$("#q").value.trim().toLowerCase();if(v.length>=2)track("s",v)},1500)});
-track("v");
+track("v");if(view=="cp")track("cp");
 fetch("/api/orgs").then(r=>r.json()).then(o=>{ORGS=Array.isArray(o)?o:[];renderOrgs()}).catch(()=>{});
 fetch("/api/links").then(r=>r.json()).then(o=>{LK=o;renderSoc()}).catch(()=>{});
 fetch("/api/jobs").then(r=>r.ok?r.json():[]).then(j=>{JD=j;jrender();const m=location.pathname.match(/^\/j\/(\d+)/);if(m)openJob(m[1])}).catch(()=>{});
