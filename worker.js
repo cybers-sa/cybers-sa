@@ -421,7 +421,7 @@ async function jobPage(request, env, id) {
 const STAT_SQL = ["CREATE TABLE IF NOT EXISTS stats (day TEXT, kind TEXT, key TEXT, n INTEGER DEFAULT 0, PRIMARY KEY(day, kind, key))", "CREATE TABLE IF NOT EXISTS seen (day TEXT, h TEXT, PRIMARY KEY(day, h))"];
 let statsReady = false;
 async function ensureStats(db) { if (statsReady) return; for (const q of STAT_SQL) await db.prepare(q).run(); statsReady = true; }
-const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp'];
+const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp', 'ct'];
 const bump = (db, day, kind, key) => db.prepare('INSERT INTO stats(day,kind,key,n) VALUES(?,?,?,1) ON CONFLICT(day,kind,key) DO UPDATE SET n=n+1').bind(day, kind, key).run();
 async function track(request, env) {
   const ok = () => new Response(null, { status: 204 });
@@ -434,7 +434,7 @@ async function track(request, env) {
   if (['ev', 'reg', 'jo', 'ja', 'jx'].includes(k) && !/^\d{1,9}$/.test(key)) return ok();
   if (k === 'sh' && !/^[ej]:\d{1,9}$/.test(key)) return ok();
   if (k === 's') { key = key.toLowerCase(); if (key.length < 2) return ok(); }
-  if (k === 'v' || k === 'cp') key = '';
+  if (k === 'v' || k === 'cp' || k === 'ct') key = '';
   try {
     const db = env.DB, day = todayRiyadh();
     await ensureStats(db);
@@ -464,7 +464,7 @@ async function adminStats(request, env) {
     for (const r of rows) {
       totals[r.kind] = (totals[r.kind] || 0) + r.n;
       if (r.kind === 'v' || r.kind === 'u') (per[r.day] = per[r.day] || {})[r.kind] = r.n;
-      else if (r.kind !== 'cp') ((tops[r.kind] = tops[r.kind] || {})[r.key] = (tops[r.kind][r.key] || 0) + r.n);
+      else if (r.kind !== 'cp' && r.kind !== 'ct') ((tops[r.kind] = tops[r.kind] || {})[r.key] = (tops[r.kind][r.key] || 0) + r.n);
     }
     const series = [];
     for (let i = days - 1; i >= 0; i--) { const d = new Date(now - i * 864e5).toISOString().slice(0, 10); series.push({ day: d, v: (per[d] || {}).v || 0, u: (per[d] || {}).u || 0 }); }
@@ -474,7 +474,7 @@ async function adminStats(request, env) {
     const top = {};
     for (const k of Object.keys(tops)) top[k] = Object.entries(tops[k]).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([key, n]) => ({ key, n, title: nm(k, key) }));
     const apps = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE substr(created_at,1,10)>=?').bind(from).first()).c;
-    const all = {}; for (const r of (await db.prepare("SELECT kind, SUM(n) n FROM stats WHERE kind IN ('v','u','cp') GROUP BY kind").all()).results) all[r.kind] = r.n;
+    const all = {}; for (const r of (await db.prepare("SELECT kind, SUM(n) n FROM stats WHERE kind IN ('v','u','cp','ct') GROUP BY kind").all()).results) all[r.kind] = r.n;
     const first = (await db.prepare("SELECT MIN(day) d FROM stats").first()) || {};
     return j({ days, series, totals, top, apps, all, since: first.d || '' });
   } catch { return j({ error: 'server' }, 500); }
