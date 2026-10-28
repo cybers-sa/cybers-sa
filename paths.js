@@ -88,7 +88,7 @@ function home(){var t=T(),P=S.data.paths;
 function hash(){var h="#paths";if(S.p){h+="/"+S.p.id;if(S.r){h+="/"+S.r;if(S.l)h+="/"+S.l}}try{history.replaceState(null,"",location.pathname+location.search+h)}catch(e){}}
 function draw(){if(!S.data)return;$("#cp").innerHTML=home()}
 function select(pid){var same=S.p&&S.p.id==pid;S.r=null;S.l=null;S.open={};
- if(same){S.p=null}else{S.p=S.data.paths.filter(function(p){return p.id==pid})[0]||null;if(S.p&&S.p.roles.length==1)S.open[S.p.roles[0]]=true}
+ if(same){S.p=null}else{S.p=S.data.paths.filter(function(p){return p.id==pid})[0]||null;try{track("cpo",pid)}catch(e){}if(S.p&&S.p.roles.length==1)S.open[S.p.roles[0]]=true}
  draw();hash();var c=$('.cp-card[data-p="'+pid+'"]');if(c&&!same)window.scrollTo({top:c.getBoundingClientRect().top+window.pageYOffset-80,behavior:"smooth"})}
 function go(rid,n,keep){var p=pathOf(rid,S.p);if(!p)return;S.p=p;S.r=rid;S.l=n;S.open[rid]=true;
  if(!keep){var i=-1;S.trail.forEach(function(x,k){if(x[0]==rid&&x[1]==n)i=k});if(i>-1)S.trail=S.trail.slice(0,i+1);else S.trail.push([rid,n])}
@@ -108,7 +108,7 @@ function init(){if(S.inited)return;S.inited=true;css();
 var rz;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){if(S.data&&$("#paths").style.display!="none"&&S.cols!=cols()){S.cols=cols();draw()}},150)});
 window.CP={open:function(){var el=$("#cp");if(!el)return;document.querySelector(".hero").classList.add("cp-on");
   if(S.data){draw();return}
-  fetch("/paths.json?v=3").then(function(r){return r.json()}).then(function(d){S.data=d;init();draw()}).catch(function(){el.innerHTML='<p style="color:var(--muted)">⚠</p>'})},
+  Promise.all([fetch("/paths.json?v=3").then(function(r){return r.json()}),fetch("/api/certs").then(function(r){if(!r.ok)throw 0;return r.json()}).catch(function(){return null})]).then(function(a){S.data=a[0];if(a[1])S.data.certs=a[1];init();draw()}).catch(function(){el.innerHTML='<p style="color:var(--muted)">⚠</p>'})},
  close:function(){var h=document.querySelector(".hero");if(h)h.classList.remove("cp-on")},
  render:function(){if(S.data&&$("#paths").style.display!="none")draw()}};
 })();

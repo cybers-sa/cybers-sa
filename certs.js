@@ -33,7 +33,7 @@ var COL={b:"#2fb67c",i:"#4f6bed",a:"#8a4fe0"};
 function card(c,k){var t=T();return'<div class="ct-c" style="--c:'+COL[k]+'" role="button" tabindex="0" data-c="'+esc(c.a)+'"><span class="ct-is">'+esc(c.i)+'</span><span class="ct-ac">'+esc(c.a)+'</span><span class="ct-nm">'+esc(c.n)+'</span><span class="ct-go">'+t.more+" ‹</span></div>"}
 function openCert(a){var c=S.d.certs.filter(function(x){return x.a==a})[0];if(!c)return;var t=T(),d=$("#ctd");
  $("#ctb").innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="tag" style="background:color-mix(in srgb,'+COL[c.l]+' 20%,transparent);color:'+COL[c.l]+'">'+t[c.l]+'</span><span class="st" style="background:#8884">'+esc(c.i)+'</span></div><h2 style="margin:14px 0 4px;direction:ltr;text-align:start">'+esc(c.a)+'</h2><div style="color:var(--muted);direction:ltr;text-align:start;margin-bottom:12px">'+esc(c.n)+'</div><div class="meta"><span>🏢 '+t.issuer+": "+esc(c.i)+"</span><span>🎓 "+t.level+": "+t[c.l]+"</span>"+(c.p.indexOf("*")>-1?"<span>🧭 "+t.gen+"</span>":"")+'</div><p class="dsc">'+esc(L()=="ar"?c.d:c.e)+'</p><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px"><a class="btn p" href="'+esc(c.u)+'" target="_blank" rel="noopener noreferrer">'+t.open+' ↗</a><button class="btn" id="ctx">'+t.back+"</button></div>";
- $("#ctx").onclick=function(){d.close()};d.showModal()}
+ $("#ctx").onclick=function(){d.close()};try{track("cto",a);d.querySelector("a.btn.p").onclick=function(){track("ctg",a)}}catch(e){}d.showModal()}
 function match(c){var q=S.q.trim().toLowerCase();if(S.p!="all"&&c.p.indexOf("*")<0&&c.p.indexOf(S.p)<0)return false;return!q||(c.a+" "+c.n+" "+c.i).toLowerCase().indexOf(q)>-1}
 function draw(){if(!S.d)return;var t=T(),P=S.d.paths;
  var pills='<button class="ct-pill'+(S.p=="all"?" on":"")+'" data-p="all">'+t.all+"</button>"+P.map(function(p){return'<button class="ct-pill'+(S.p==p.id?" on":"")+'" data-p="'+p.id+'">'+p.ico+" "+esc(L()=="ar"?p.ar:p.en)+"</button>"}).join("");
@@ -56,7 +56,7 @@ function init(){if(S.inited)return;S.inited=true;css();if(!$("#ctd")){var dg=doc
  var h=location.hash.replace(/^#certs\/?/,"");if(h&&S.d.paths.some(function(p){return p.id==h}))S.p=h}
 window.CT={open:function(){var el=$("#ct");if(!el)return;document.querySelector(".hero").classList.add("cp-on");
   if(S.d){draw();return}
-  fetch("/paths.json?v=3").then(function(r){return r.json()}).then(function(d){S.d=d;init();draw()}).catch(function(){el.innerHTML='<p style="color:var(--muted)">⚠</p>'})},
+  Promise.all([fetch("/paths.json?v=3").then(function(r){return r.json()}),fetch("/api/certs").then(function(r){if(!r.ok)throw 0;return r.json()}).catch(function(){return null})]).then(function(a){S.d=a[0];if(a[1])S.d.certs=a[1];init();draw()}).catch(function(){el.innerHTML='<p style="color:var(--muted)">⚠</p>'})},
  close:function(){var h=document.querySelector(".hero");if(h)h.classList.remove("cp-on")},
  render:function(){if(S.d&&$("#certs").style.display!="none")draw()}};
 })();

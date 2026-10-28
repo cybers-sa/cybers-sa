@@ -421,7 +421,7 @@ async function jobPage(request, env, id) {
 const STAT_SQL = ["CREATE TABLE IF NOT EXISTS stats (day TEXT, kind TEXT, key TEXT, n INTEGER DEFAULT 0, PRIMARY KEY(day, kind, key))", "CREATE TABLE IF NOT EXISTS seen (day TEXT, h TEXT, PRIMARY KEY(day, h))"];
 let statsReady = false;
 async function ensureStats(db) { if (statsReady) return; for (const q of STAT_SQL) await db.prepare(q).run(); statsReady = true; }
-const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp', 'ct'];
+const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp', 'ct', 'cto', 'ctg', 'cpo'];
 const bump = (db, day, kind, key) => db.prepare('INSERT INTO stats(day,kind,key,n) VALUES(?,?,?,1) ON CONFLICT(day,kind,key) DO UPDATE SET n=n+1').bind(day, kind, key).run();
 async function track(request, env) {
   const ok = () => new Response(null, { status: 204 });
@@ -433,13 +433,15 @@ async function track(request, env) {
   if (!SK.includes(k)) return ok();
   if (['ev', 'reg', 'jo', 'ja', 'jx'].includes(k) && !/^\d{1,9}$/.test(key)) return ok();
   if (k === 'sh' && !/^[ej]:\d{1,9}$/.test(key)) return ok();
+  if ((k === 'cto' || k === 'ctg') && !/^[A-Za-z0-9 .+\/\-]{1,40}$/.test(key)) return ok();
+  if (k === 'cpo' && !/^[a-z]{2,8}$/.test(key)) return ok();
   if (k === 's') { key = key.toLowerCase(); if (key.length < 2) return ok(); }
   if (k === 'v' || k === 'cp' || k === 'ct') key = '';
   try {
     const db = env.DB, day = todayRiyadh();
     await ensureStats(db);
-    if (k === 's' && !(await db.prepare("SELECT 1 x FROM stats WHERE day=? AND kind='s' AND key=?").bind(day, key).first())) {
-      const c = await db.prepare("SELECT COUNT(*) c FROM stats WHERE day=? AND kind='s'").bind(day).first();
+    if (['s', 'cto', 'ctg'].includes(k) && !(await db.prepare("SELECT 1 x FROM stats WHERE day=? AND kind=? AND key=?").bind(day, k, key).first())) {
+      const c = await db.prepare("SELECT COUNT(*) c FROM stats WHERE day=? AND kind=?").bind(day, k).first();
       if (c.c >= 300) return ok();
     }
     await bump(db, day, k, key);
@@ -470,7 +472,7 @@ async function adminStats(request, env) {
     for (let i = days - 1; i >= 0; i--) { const d = new Date(now - i * 864e5).toISOString().slice(0, 10); series.push({ day: d, v: (per[d] || {}).v || 0, u: (per[d] || {}).u || 0 }); }
     const ev = Object.fromEntries((await db.prepare('SELECT id,title_ar FROM events').all()).results.map(r => [r.id, r.title_ar]));
     const jb = Object.fromEntries((await db.prepare('SELECT id,title_ar FROM jobs').all()).results.map(r => [r.id, r.title_ar]));
-    const nm = (k, key) => k === 's' ? key : k === 'sh' ? ((key[0] === 'e' ? ev : jb)[key.slice(2)] || key) : (['jo', 'ja', 'jx'].includes(k) ? jb : ev)[key] || ('#' + key);
+    const nm = (k, key) => k === 's' || k === 'cto' || k === 'ctg' ? key : k === 'cpo' ? (PATH_AR[key] || key) : k === 'sh' ? ((key[0] === 'e' ? ev : jb)[key.slice(2)] || key) : (['jo', 'ja', 'jx'].includes(k) ? jb : ev)[key] || ('#' + key);
     const top = {};
     for (const k of Object.keys(tops)) top[k] = Object.entries(tops[k]).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([key, n]) => ({ key, n, title: nm(k, key) }));
     const apps = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE substr(created_at,1,10)>=?').bind(from).first()).c;
@@ -506,6 +508,57 @@ async function adminLinks(request, env) {
   } catch { return j({ error: 'server' }, 500); }
 }
 
+// ---------- الشهادات المهنية (تُدار من الأدمن) ----------
+const CERT_PATHS = ['soc', 'grc', 'pt', 'net', 'ir', 'dfir', 'iam', 'eng', 'cloud', 'ot', 'lead', 'more'];
+const PATH_AR = { soc: 'مركز العمليات الأمنية (SOC)', grc: 'الحوكمة والمخاطر والامتثال (GRC)', pt: 'اختبار الاختراق', net: 'أمن الشبكات', ir: 'الاستجابة للحوادث', dfir: 'التحليل الجنائي الرقمي', iam: 'إدارة الهوية والوصول (IAM)', eng: 'هندسة الأمن', cloud: 'الأمن السحابي', ot: 'أمن نظم التحكم الصناعي (OT/ICS)', lead: 'القيادة والإدارة', more: 'أدوار متخصصة أخرى' };
+let certsReady = false;
+async function ensureCerts(db, env, origin) {
+  if (certsReady) return;
+  await db.prepare('CREATE TABLE IF NOT EXISTS certs (id INTEGER PRIMARY KEY AUTOINCREMENT, acr TEXT UNIQUE, name TEXT, issuer TEXT, level TEXT, paths TEXT, url TEXT, d_ar TEXT, d_en TEXT, pos INTEGER DEFAULT 0, published INTEGER DEFAULT 1)').run();
+  await db.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
+  if (!(await db.prepare("SELECT 1 x FROM settings WHERE k='certs_seeded'").first())) {
+    try {
+      const r = await env.ASSETS.fetch(new Request(origin + '/paths.json')), d = await r.json();
+      let i = 0;
+      for (const c of d.certs || []) await db.prepare('INSERT OR IGNORE INTO certs(acr,name,issuer,level,paths,url,d_ar,d_en,pos,published) VALUES(?,?,?,?,?,?,?,?,?,1)').bind(c.a, c.n, c.i, c.l, JSON.stringify(c.p), c.u, c.d || '', c.e || '', i++).run();
+      if ((d.certs || []).length) await db.prepare("INSERT OR REPLACE INTO settings(k,v) VALUES('certs_seeded','1')").run();
+    } catch {}
+  }
+  certsReady = true;
+}
+const certOut = r => ({ id: r.id, a: r.acr, n: r.name, i: r.issuer, l: r.level, p: (() => { try { return JSON.parse(r.paths); } catch { return []; } })(), u: r.url, d: r.d_ar || '', e: r.d_en || '', published: r.published });
+async function publicCerts(request, env) {
+  try {
+    await ensureCerts(env.DB, env, new URL(request.url).origin);
+    const rows = (await env.DB.prepare('SELECT * FROM certs WHERE published=1 ORDER BY pos, id').all()).results;
+    return new Response(JSON.stringify(rows.map(certOut)), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
+  } catch { return j({ error: 'server' }, 500); }
+}
+function cclean(b) {
+  const s = (k, n) => String(b[k] ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, n);
+  const paths = Array.isArray(b.paths) ? [...new Set(b.paths.map(String))].filter(x => x === '*' || CERT_PATHS.includes(x)) : [];
+  const url = s('url', 300);
+  if (!/^[A-Za-z0-9 .+\/\-]{1,40}$/.test(s('acr', 40)) || !s('name', 120) || !['b', 'i', 'a'].includes(b.level) || !paths.length || !/^https:\/\/[^\s]+$/i.test(url)) return null;
+  return [s('acr', 40), s('name', 120), s('issuer', 60), b.level, JSON.stringify(paths), url, s('d_ar', 600), s('d_en', 600), b.published === false || b.published === 0 ? 0 : 1];
+}
+async function adminCerts(request, env, id) {
+  const db = env.DB, m = request.method, num = /^\d+$/.test(id || '');
+  try {
+    await ensureCerts(db, env, new URL(request.url).origin);
+    if (m === 'POST' || (m === 'PUT' && num)) {
+      const v = cclean(await request.json().catch(() => ({})));
+      if (!v) return j({ error: 'bad' }, 400);
+      try {
+        if (m === 'POST') await db.prepare('INSERT INTO certs(acr,name,issuer,level,paths,url,d_ar,d_en,published,pos) VALUES(?,?,?,?,?,?,?,?,?,(SELECT COALESCE(MAX(pos),0)+1 FROM certs))').bind(...v).run();
+        else await db.prepare('UPDATE certs SET acr=?,name=?,issuer=?,level=?,paths=?,url=?,d_ar=?,d_en=?,published=? WHERE id=?').bind(...v, id).run();
+      } catch { return j({ error: 'dup' }, 409); }
+      return j({ ok: 1 }, m === 'POST' ? 201 : 200);
+    }
+    if (m === 'DELETE' && num) { await db.prepare('DELETE FROM certs WHERE id=?').bind(id).run(); return j({ ok: 1 }); }
+    return j((await db.prepare('SELECT * FROM certs ORDER BY pos, id').all()).results.map(certOut));
+  } catch { return j({ error: 'server' }, 500); }
+}
+
 export default {
   async fetch(request, env) {
     const p = new URL(request.url).pathname, m = request.method;
@@ -515,6 +568,7 @@ export default {
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
     if (p === '/api/t' && m === 'POST') return track(request, env);
     if (p === '/api/orgs' && m === 'GET') return publicOrgs(env);
+    if (p === '/api/certs' && m === 'GET') return publicCerts(request, env);
     if (p === '/api/links' && m === 'GET') return new Response(JSON.stringify(await getLinks(env.DB)), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
     if (p === '/api/jobs' && m === 'GET') return publicJobs(env);
     if (p === '/api/apply' && m === 'POST') return apply(request, env);
@@ -527,6 +581,7 @@ export default {
       if (seg[3] === 'organizers') return adminOrgs(request, env, seg[4]);
       if (seg[3] === 'stats') return adminStats(request, env);
       if (seg[3] === 'links') return adminLinks(request, env);
+      if (seg[3] === 'certs') return adminCerts(request, env, seg[4]);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);
       if (seg[3] === 'cv' && seg[4]) return adminCv(env, seg[4], new URL(request.url).searchParams.get('view'));
