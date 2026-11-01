@@ -439,7 +439,7 @@ async function jobPage(request, env, id) {
 const STAT_SQL = ["CREATE TABLE IF NOT EXISTS stats (day TEXT, kind TEXT, key TEXT, n INTEGER DEFAULT 0, PRIMARY KEY(day, kind, key))", "CREATE TABLE IF NOT EXISTS seen (day TEXT, h TEXT, PRIMARY KEY(day, h))"];
 let statsReady = false;
 async function ensureStats(db) { if (statsReady) return; for (const q of STAT_SQL) await db.prepare(q).run(); statsReady = true; }
-const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp', 'ct', 'cto', 'ctg', 'cpo'];
+const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp', 'ct', 'cto', 'ctg', 'cpo', 'bv', 'bl'];
 const bump = (db, day, kind, key) => db.prepare('INSERT INTO stats(day,kind,key,n) VALUES(?,?,?,1) ON CONFLICT(day,kind,key) DO UPDATE SET n=n+1').bind(day, kind, key).run();
 async function track(request, env) {
   const ok = () => new Response(null, { status: 204 });
@@ -452,9 +452,10 @@ async function track(request, env) {
   if (['ev', 'reg', 'jo', 'ja', 'jx'].includes(k) && !/^\d{1,9}$/.test(key)) return ok();
   if (k === 'sh' && !/^[ej]:\d{1,9}$/.test(key)) return ok();
   if ((k === 'cto' || k === 'ctg') && !/^[A-Za-z0-9 .+\/\-]{1,40}$/.test(key)) return ok();
+  if (k === 'bl' && !/^\d{1,9}$/.test(key)) return ok();
   if (k === 'cpo' && !/^[a-z]{2,8}$/.test(key)) return ok();
   if (k === 's') { key = key.toLowerCase(); if (key.length < 2) return ok(); }
-  if (k === 'v' || k === 'cp' || k === 'ct') key = '';
+  if (k === 'v' || k === 'cp' || k === 'ct' || k === 'bv') key = '';
   try {
     const db = env.DB, day = todayRiyadh();
     await ensureStats(db);
@@ -484,17 +485,18 @@ async function adminStats(request, env) {
     for (const r of rows) {
       totals[r.kind] = (totals[r.kind] || 0) + r.n;
       if (r.kind === 'v' || r.kind === 'u') (per[r.day] = per[r.day] || {})[r.kind] = r.n;
-      else if (r.kind !== 'cp' && r.kind !== 'ct') ((tops[r.kind] = tops[r.kind] || {})[r.key] = (tops[r.kind][r.key] || 0) + r.n);
+      else if (r.kind !== 'cp' && r.kind !== 'ct' && r.kind !== 'bv') ((tops[r.kind] = tops[r.kind] || {})[r.key] = (tops[r.kind][r.key] || 0) + r.n);
     }
     const series = [];
     for (let i = days - 1; i >= 0; i--) { const d = new Date(now - i * 864e5).toISOString().slice(0, 10); series.push({ day: d, v: (per[d] || {}).v || 0, u: (per[d] || {}).u || 0 }); }
     const ev = Object.fromEntries((await db.prepare('SELECT id,title_ar FROM events').all()).results.map(r => [r.id, r.title_ar]));
     const jb = Object.fromEntries((await db.prepare('SELECT id,title_ar FROM jobs').all()).results.map(r => [r.id, r.title_ar]));
-    const nm = (k, key) => k === 's' || k === 'cto' || k === 'ctg' ? key : k === 'cpo' ? (PATH_AR[key] || key) : k === 'sh' ? ((key[0] === 'e' ? ev : jb)[key.slice(2)] || key) : (['jo', 'ja', 'jx'].includes(k) ? jb : ev)[key] || ('#' + key);
+    const bt = Object.fromEntries((await db.prepare('SELECT id,title FROM bio').all().catch(() => ({ results: [] }))).results.map(r => [r.id, r.title]));
+    const nm = (k, key) => k === 'bl' ? (bt[key] || '#' + key) : k === 's' || k === 'cto' || k === 'ctg' ? key : k === 'cpo' ? (PATH_AR[key] || key) : k === 'sh' ? ((key[0] === 'e' ? ev : jb)[key.slice(2)] || key) : (['jo', 'ja', 'jx'].includes(k) ? jb : ev)[key] || ('#' + key);
     const top = {};
     for (const k of Object.keys(tops)) top[k] = Object.entries(tops[k]).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([key, n]) => ({ key, n, title: nm(k, key) }));
     const apps = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE substr(created_at,1,10)>=?').bind(from).first()).c;
-    const all = {}; for (const r of (await db.prepare("SELECT kind, SUM(n) n FROM stats WHERE kind IN ('v','u','cp','ct') GROUP BY kind").all()).results) all[r.kind] = r.n;
+    const all = {}; for (const r of (await db.prepare("SELECT kind, SUM(n) n FROM stats WHERE kind IN ('v','u','cp','ct','bv','bl') GROUP BY kind").all()).results) all[r.kind] = r.n;
     const first = (await db.prepare("SELECT MIN(day) d FROM stats").first()) || {};
     return j({ days, series, totals, top, apps, all, since: first.d || '' });
   } catch { return j({ error: 'server' }, 500); }
@@ -524,6 +526,60 @@ async function adminLinks(request, env) {
     }
     return j(await getLinks(env.DB));
   } catch { return j({ error: 'server' }, 500); }
+}
+
+// ---------- صفحة الروابط /links (تُدار من الأدمن) ----------
+const BIO_DEF = [['سايبرز | فرص وفعاليات', 'https://cybers-sa.com/'], ['حساب اكس', 'https://x.com/Cybers_SA'], ['قناة التيلجرام', 'https://t.me/Cybers_SA'], ['LinkedIn', 'https://www.linkedin.com/company/cybers-sa']];
+let bioReady = false;
+async function ensureBio(db) {
+  if (bioReady) return;
+  await db.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
+  await db.prepare('CREATE TABLE IF NOT EXISTS bio (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, url TEXT, icon TEXT DEFAULT \'\', pos INTEGER DEFAULT 0, published INTEGER DEFAULT 1)').run();
+  if (!(await db.prepare("SELECT 1 x FROM settings WHERE k='bio_seeded'").first())) {
+    if (!(await db.prepare('SELECT 1 x FROM bio').first())) for (const [i, [t, u]] of BIO_DEF.entries()) await db.prepare('INSERT INTO bio(title,url,pos) VALUES(?,?,?)').bind(t, u, i + 1).run();
+    await db.prepare("INSERT OR IGNORE INTO settings(k,v) VALUES('bio_seeded','1')").run();
+  }
+  bioReady = true;
+}
+const BIO_P = { name: 'cybers_sa', desc: 'سايبرز | الأمن السيبراني: فرص وفعاليات ومصادر مفيدة' };
+async function bioProfile(db) {
+  try { const r = await db.prepare("SELECT v FROM settings WHERE k='bio_profile'").first(); const o = r ? JSON.parse(r.v) : {}; return { name: String(o.name || BIO_P.name).slice(0, 40), desc: String(o.desc ?? BIO_P.desc).slice(0, 300) }; } catch { return { ...BIO_P }; }
+}
+async function publicBio(env) {
+  try {
+    await ensureBio(env.DB);
+    const items = (await env.DB.prepare('SELECT id,title,url,icon FROM bio WHERE published=1 ORDER BY pos,id').all()).results.map(r => ({ id: r.id, t: r.title, u: r.url, i: r.icon || '' }));
+    return new Response(JSON.stringify({ profile: await bioProfile(env.DB), items }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
+  } catch { return j({ error: 'server' }, 500); }
+}
+async function adminBio(request, env, id) {
+  const m = request.method, db = env.DB;
+  try {
+    await ensureBio(db);
+    if (m === 'GET') return j({ profile: await bioProfile(db), items: (await db.prepare('SELECT * FROM bio ORDER BY pos,id').all()).results });
+    if (m === 'PUT' && id === 'profile') {
+      const b = await request.json();
+      await db.prepare("INSERT INTO settings(k,v) VALUES('bio_profile',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify({ name: String(b.name || '').trim().slice(0, 40) || BIO_P.name, desc: String(b.desc || '').trim().slice(0, 300) })).run();
+      return j({ ok: 1 });
+    }
+    if (m === 'POST' && id === 'order') {
+      const ids = (await request.json()).ids;
+      if (!Array.isArray(ids) || ids.length > 200) return j({ error: 'bad' }, 400);
+      for (const [i, x] of ids.entries()) await db.prepare('UPDATE bio SET pos=? WHERE id=?').bind(i + 1, Number(x) || 0).run();
+      return j({ ok: 1 });
+    }
+    if (m === 'POST' || (m === 'PUT' && id)) {
+      const b = await request.json(), t = String(b.title || '').trim().slice(0, 80), u = String(b.url || '').trim();
+      if (!t) return j({ error: 'title' }, 400);
+      if (!/^https:\/\/[^\s]{3,300}$/i.test(u)) return j({ error: 'url' }, 400);
+      const ic = [...String(b.icon || '').trim()].slice(0, 2).join('');
+      if (m === 'POST') { const p = (await db.prepare('SELECT COALESCE(MAX(pos),0)+1 p FROM bio').first()).p; await db.prepare('INSERT INTO bio(title,url,icon,pos,published) VALUES(?,?,?,?,?)').bind(t, u, ic, p, b.published === false ? 0 : 1).run(); return j({ ok: 1 }, 201); }
+      await db.prepare('UPDATE bio SET title=?,url=?,icon=?,published=? WHERE id=?').bind(t, u, ic, b.published ? 1 : 0, id).run();
+      return j({ ok: 1 });
+    }
+    if (m === 'DELETE' && id) { await db.prepare('DELETE FROM bio WHERE id=?').bind(id).run(); return j({ ok: 1 }); }
+  } catch { return j({ error: 'server' }, 500); }
+  return j({ error: 'bad request' }, 400);
 }
 
 // ---------- الشهادات المهنية (تُدار من الأدمن) ----------
@@ -588,6 +644,7 @@ export default {
     if (p === '/api/t' && m === 'POST') return track(request, env);
     if (p === '/api/orgs' && m === 'GET') return publicOrgs(env);
     if (p === '/api/certs' && m === 'GET') return publicCerts(request, env);
+    if (p === '/api/bio' && m === 'GET') return publicBio(env);
     if (p === '/api/links' && m === 'GET') return new Response(JSON.stringify(await getLinks(env.DB)), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
     if (p === '/api/jobs' && m === 'GET') return publicJobs(env);
     if (p === '/api/apply' && m === 'POST') return apply(request, env);
@@ -600,6 +657,7 @@ export default {
       if (seg[3] === 'organizers') return adminOrgs(request, env, seg[4]);
       if (seg[3] === 'stats') return adminStats(request, env);
       if (seg[3] === 'links') return adminLinks(request, env);
+      if (seg[3] === 'bio') return adminBio(request, env, seg[4]);
       if (seg[3] === 'certs') return adminCerts(request, env, seg[4]);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);
