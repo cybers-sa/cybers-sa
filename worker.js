@@ -478,9 +478,17 @@ async function adminStats(request, env) {
   const db = env.DB;
   try {
     await ensureStats(db); await ensureJobs(db); await migrate(db);
-    const days = Math.min(90, Math.max(1, Number(new URL(request.url).searchParams.get('days')) || 30));
-    const now = Date.now() + 3 * 3600e3, from = new Date(now - (days - 1) * 864e5).toISOString().slice(0, 10);
-    const rows = (await db.prepare('SELECT day,kind,key,n FROM stats WHERE day>=?').bind(from).all()).results;
+    const qs = new URL(request.url).searchParams, isD = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(Date.parse(s));
+    const now = Date.now() + 3 * 3600e3, today = new Date(now).toISOString().slice(0, 10);
+    let to = isD(qs.get('to')) ? qs.get('to') : today, from = isD(qs.get('from')) ? qs.get('from') : '';
+    if (to > today) to = today;
+    if (!from) from = new Date(Date.parse(to) - (Math.min(365, Math.max(1, Number(qs.get('days')) || 30)) - 1) * 864e5).toISOString().slice(0, 10);
+    if (from > to) [from, to] = [to, from];
+    let days = Math.round((Date.parse(to) - Date.parse(from)) / 864e5) + 1;
+    if (days > 366) { days = 366; from = new Date(Date.parse(to) - 365 * 864e5).toISOString().slice(0, 10); }
+    const pTo = new Date(Date.parse(from) - 864e5).toISOString().slice(0, 10), pFrom = new Date(Date.parse(from) - days * 864e5).toISOString().slice(0, 10);
+    const prev = {}; for (const r of (await db.prepare('SELECT kind, SUM(n) n FROM stats WHERE day>=? AND day<=? GROUP BY kind').bind(pFrom, pTo).all()).results) prev[r.kind] = r.n;
+    const rows = (await db.prepare('SELECT day,kind,key,n FROM stats WHERE day>=? AND day<=?').bind(from, to).all()).results;
     const totals = {}, per = {}, tops = {};
     for (const r of rows) {
       totals[r.kind] = (totals[r.kind] || 0) + r.n;
@@ -488,17 +496,17 @@ async function adminStats(request, env) {
       else if (r.kind !== 'cp' && r.kind !== 'ct' && r.kind !== 'bv') ((tops[r.kind] = tops[r.kind] || {})[r.key] = (tops[r.kind][r.key] || 0) + r.n);
     }
     const series = [];
-    for (let i = days - 1; i >= 0; i--) { const d = new Date(now - i * 864e5).toISOString().slice(0, 10); series.push({ day: d, v: (per[d] || {}).v || 0, u: (per[d] || {}).u || 0 }); }
+    for (let i = days - 1; i >= 0; i--) { const d = new Date(Date.parse(to) - i * 864e5).toISOString().slice(0, 10); series.push({ day: d, v: (per[d] || {}).v || 0, u: (per[d] || {}).u || 0 }); }
     const ev = Object.fromEntries((await db.prepare('SELECT id,title_ar FROM events').all()).results.map(r => [r.id, r.title_ar]));
     const jb = Object.fromEntries((await db.prepare('SELECT id,title_ar FROM jobs').all()).results.map(r => [r.id, r.title_ar]));
     const bt = Object.fromEntries((await db.prepare('SELECT id,title FROM bio').all().catch(() => ({ results: [] }))).results.map(r => [r.id, r.title]));
     const nm = (k, key) => k === 'bl' ? (bt[key] || '#' + key) : k === 's' || k === 'cto' || k === 'ctg' ? key : k === 'cpo' ? (PATH_AR[key] || key) : k === 'sh' ? ((key[0] === 'e' ? ev : jb)[key.slice(2)] || key) : (['jo', 'ja', 'jx'].includes(k) ? jb : ev)[key] || ('#' + key);
     const top = {};
-    for (const k of Object.keys(tops)) top[k] = Object.entries(tops[k]).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([key, n]) => ({ key, n, title: nm(k, key) }));
-    const apps = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE substr(created_at,1,10)>=?').bind(from).first()).c;
+    for (const k of Object.keys(tops)) top[k] = Object.entries(tops[k]).sort((a, b) => b[1] - a[1]).slice(0, 50).map(([key, n]) => ({ key, n, title: nm(k, key) }));
+    const apps = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE substr(created_at,1,10)>=? AND substr(created_at,1,10)<=?').bind(from, to).first()).c;
     const all = {}; for (const r of (await db.prepare("SELECT kind, SUM(n) n FROM stats WHERE kind IN ('v','u','cp','ct','bv','bl') GROUP BY kind").all()).results) all[r.kind] = r.n;
     const first = (await db.prepare("SELECT MIN(day) d FROM stats").first()) || {};
-    return j({ days, series, totals, top, apps, all, since: first.d || '' });
+    return j({ days, from, to, series, totals, prev, top, apps, all, since: first.d || '' });
   } catch { return j({ error: 'server' }, 500); }
 }
 
