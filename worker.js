@@ -506,7 +506,9 @@ async function adminStats(request, env) {
     const apps = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE substr(created_at,1,10)>=? AND substr(created_at,1,10)<=?').bind(from, to).first()).c;
     const all = {}; for (const r of (await db.prepare("SELECT kind, SUM(n) n FROM stats WHERE kind IN ('v','u','cp','ct','bv','bl') GROUP BY kind").all()).results) all[r.kind] = r.n;
     const first = (await db.prepare("SELECT MIN(day) d FROM stats").first()) || {};
-    return j({ days, from, to, series, totals, prev, top, apps, all, since: first.d || '' });
+    let perAll = null;
+    if (qs.get('per')) { perAll = {}; for (const r of (await db.prepare("SELECT kind,key,SUM(n) n FROM stats WHERE kind IN ('ev','reg','sh','jo','ja','jx') GROUP BY kind,key").all()).results) (perAll[r.kind] = perAll[r.kind] || {})[r.key] = r.n; }
+    return j({ days, from, to, series, totals, prev, top, apps, all, per: perAll, since: first.d || '' });
   } catch { return j({ error: 'server' }, 500); }
 }
 
