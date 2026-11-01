@@ -32,7 +32,7 @@ async function addCols(db, table, map) {
 let migrated = false, subMig = false;
 async function migrate(db) {
   if (migrated) return;
-  await addCols(db, 'events', { desc_ar: '', desc_en: '', delivery: 'live', show_ended: ['INTEGER', '0'], place: '' });
+  await addCols(db, 'events', { desc_ar: '', desc_en: '', delivery: 'live', show_ended: ['INTEGER', '0'], place: '', pinned: ['INTEGER', '0'] });
   // مرة واحدة: القيمة القديمة self كانت تعني «ذاتية مستمرة» فتتحول إلى cont
   await db.prepare('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)').run();
   if (!(await db.prepare("SELECT v FROM meta WHERE k='delivery_v2'").first())) {
@@ -78,7 +78,7 @@ async function publicEvents(env) {
   const out = r.results.map(e => ({
     id: e.id, type: e.type, title: { ar: e.title_ar, en: e.title_en || e.title_ar },
     city: e.city, place: e.place || '', mode: e.mode, delivery: e.delivery || 'live', start: e.start_date || '', end: e.end_date || '',
-    deadline: e.deadline, org: e.org, link: e.link, closed: !!e.closed, keep: Number(e.show_ended) === 1,
+    deadline: e.deadline, org: e.org, link: e.link, closed: !!e.closed, keep: Number(e.show_ended) === 1, pin: Number(e.pinned) === 1,
     desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' },
     logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : ''
   }));
@@ -86,12 +86,12 @@ async function publicEvents(env) {
 }
 
 // ---------- الفعاليات (للأدمن) ----------
-const cols = ['type','title_ar','title_en','desc_ar','desc_en','city','mode','delivery','start_date','end_date','deadline','org','link','closed','published','show_ended','place'];
+const cols = ['type','title_ar','title_en','desc_ar','desc_en','city','mode','delivery','start_date','end_date','deadline','org','link','closed','published','show_ended','place','pinned'];
 const dOk = s => !s || (/^\d{4}-\d{2}-\d{2}$/.test(s) && +s.slice(0, 4) >= 2020 && +s.slice(0, 4) <= 2100);
 const datesBad = (a, b, c) => !dOk(a) || !dOk(b) || !dOk(c) || (a && b && b < a);
 const clean = b => cols.map(c => {
   if (c === 'delivery') return ['self', 'cont'].includes(b[c]) ? b[c] : 'live';
-  if (c === 'closed' || c === 'published' || c === 'show_ended') return b[c] ? 1 : 0;
+  if (c === 'closed' || c === 'published' || c === 'show_ended' || c === 'pinned') return b[c] ? 1 : 0;
   let v = String(b[c] ?? '').trim().slice(0, c.startsWith('desc_') ? 1500 : 300);
   if (c === 'link' && v && !/^https?:\/\//i.test(v)) v = '';
   return v;
@@ -272,7 +272,7 @@ async function ensureJobs(db) {
   if (jobsReady) return;
   for (const q of [JOB_SQL, APP_SQL, CV_SQL]) await db.prepare(q).run();
   await ensureOrg(db);
-  await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0] });
+  await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0] });
   jobsReady = true;
 }
 const jq = s => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
@@ -285,7 +285,7 @@ async function publicJobs(env) {
   return Response.json(r.results.map(e => ({
     id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, place: e.place || '', mode: e.mode === 'online' ? 'online' : 'onsite', kind: e.kind,
     deadline: e.deadline || '', closed: !!e.closed || (Number(e.max_apps) > 0 && e.n >= Number(e.max_apps)), exp: e.exp || '', created: e.created_at || '', ref: 'CYB-' + String(e.created_at || '').slice(0, 4) + '-' + String(e.id).padStart(3, '0'), desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' }, q: jq(e.questions),
-    logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : '', link: /^https?:\/\//i.test(e.link || '') ? e.link : ''
+    logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : '', link: /^https?:\/\//i.test(e.link || '') ? e.link : '', pin: Number(e.pinned) === 1
   })), { headers: { 'Cache-Control': 'no-store' } });
 }
 
@@ -345,9 +345,9 @@ function jclean(b) {
   const s = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n);
   const qs = (Array.isArray(b.questions) ? b.questions : []).map(x => String(x).trim().slice(0, 250)).filter(Boolean).slice(0, 10);
   return [s('title_ar'), s('title_en'), s('org'), CITIES.concat('x').includes(b.city) ? b.city : 'r', JMODES.includes(b.mode) ? b.mode : 'onsite',
-    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0))];
+    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0)), b.pinned ? 1 : 0];
 }
-const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps'.split(',');
+const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps,pinned'.split(',');
 async function adminJobs(request, env, id) {
   const m = request.method, db = env.DB;
   try {
