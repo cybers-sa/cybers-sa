@@ -439,7 +439,7 @@ async function jobPage(request, env, id) {
 const STAT_SQL = ["CREATE TABLE IF NOT EXISTS stats (day TEXT, kind TEXT, key TEXT, n INTEGER DEFAULT 0, PRIMARY KEY(day, kind, key))", "CREATE TABLE IF NOT EXISTS seen (day TEXT, h TEXT, PRIMARY KEY(day, h))"];
 let statsReady = false;
 async function ensureStats(db) { if (statsReady) return; for (const q of STAT_SQL) await db.prepare(q).run(); statsReady = true; }
-const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp', 'ct', 'cto', 'ctg', 'cpo', 'bv', 'bl'];
+const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp', 'ct', 'cto', 'ctg', 'cpo', 'bv', 'bl', 'cm'];
 const bump = (db, day, kind, key) => db.prepare('INSERT INTO stats(day,kind,key,n) VALUES(?,?,?,1) ON CONFLICT(day,kind,key) DO UPDATE SET n=n+1').bind(day, kind, key).run();
 async function track(request, env) {
   const ok = () => new Response(null, { status: 204 });
@@ -455,7 +455,7 @@ async function track(request, env) {
   if (k === 'bl' && !/^\d{1,9}$/.test(key)) return ok();
   if (k === 'cpo' && !/^[a-z]{2,8}$/.test(key)) return ok();
   if (k === 's') { key = key.toLowerCase(); if (key.length < 2) return ok(); }
-  if (k === 'v' || k === 'cp' || k === 'ct' || k === 'bv') key = '';
+  if (k === 'v' || k === 'cp' || k === 'ct' || k === 'bv' || k === 'cm') key = '';
   try {
     const db = env.DB, day = todayRiyadh();
     await ensureStats(db);
@@ -493,7 +493,7 @@ async function adminStats(request, env) {
     for (const r of rows) {
       totals[r.kind] = (totals[r.kind] || 0) + r.n;
       if (r.kind === 'v' || r.kind === 'u') (per[r.day] = per[r.day] || {})[r.kind] = r.n;
-      else if (r.kind !== 'cp' && r.kind !== 'ct' && r.kind !== 'bv') ((tops[r.kind] = tops[r.kind] || {})[r.key] = (tops[r.kind][r.key] || 0) + r.n);
+      else if (r.kind !== 'cp' && r.kind !== 'ct' && r.kind !== 'bv' && r.kind !== 'cm') ((tops[r.kind] = tops[r.kind] || {})[r.key] = (tops[r.kind][r.key] || 0) + r.n);
     }
     const series = [];
     for (let i = days - 1; i >= 0; i--) { const d = new Date(Date.parse(to) - i * 864e5).toISOString().slice(0, 10); series.push({ day: d, v: (per[d] || {}).v || 0, u: (per[d] || {}).u || 0 }); }
@@ -508,7 +508,8 @@ async function adminStats(request, env) {
     const first = (await db.prepare("SELECT MIN(day) d FROM stats").first()) || {};
     let perAll = null;
     if (qs.get('per')) { perAll = {}; for (const r of (await db.prepare("SELECT kind,key,SUM(n) n FROM stats WHERE kind IN ('ev','reg','sh','jo','ja','jx') GROUP BY kind,key").all()).results) (perAll[r.kind] = perAll[r.kind] || {})[r.key] = r.n; }
-    return j({ days, from, to, series, totals, prev, top, apps, all, per: perAll, since: first.d || '' });
+    let msgsN = 0; try { await ensureMsgs(db); msgsN = (await db.prepare('SELECT COUNT(*) c FROM msgs WHERE substr(created_at,1,10)>=? AND substr(created_at,1,10)<=?').bind(from, to).first()).c; } catch {}
+    return j({ days, from, to, series, totals, prev, top, apps, msgs: msgsN, all, per: perAll, since: first.d || '' });
   } catch { return j({ error: 'server' }, 500); }
 }
 
@@ -536,6 +537,41 @@ async function adminLinks(request, env) {
     }
     return j(await getLinks(env.DB));
   } catch { return j({ error: 'server' }, 500); }
+}
+
+// ---------- رسائل التواصل (من الزوار) ----------
+const MSG_SQL = "CREATE TABLE IF NOT EXISTS msgs (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, topic TEXT, channel TEXT, contact TEXT, message TEXT, status TEXT DEFAULT 'new', ip_hash TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
+const MSG_TOPICS = ['inq', 'sug', 'par', 'rep', 'oth'], MSG_CH = ['wa', 'tg', 'em'], MSG_ST = ['new', 'done', 'closed'];
+let msgReady = false;
+async function ensureMsgs(db) { if (msgReady) return; await db.prepare(MSG_SQL).run(); msgReady = true; }
+const contactOk = (ch, c) => ch === 'em' ? /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(c) : ch === 'wa' ? /^\+?[0-9][0-9 \-]{6,18}$/.test(c) : /^@?[A-Za-z0-9_]{4,32}$/.test(c);
+async function contactSubmit(request, env) {
+  if (Number(request.headers.get('content-length') || 0) > 6000) return j({ error: 'size' }, 413);
+  let b; try { b = await request.json(); } catch { return j({ error: 'bad' }, 400); }
+  if (b.website) return j({ ok: 1 });
+  if (!b.consent) return j({ error: 'consent' }, 400);
+  if (Date.now() - Number(b.t || 0) < 3000) return j({ error: 'fast' }, 429);
+  const v = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n), name = v('name', 80), ch = v('channel'), c = v('contact', 120), msg = v('message', 1500);
+  if (name.length < 2 || !MSG_TOPICS.includes(v('topic')) || !MSG_CH.includes(ch) || !contactOk(ch, c) || msg.length < 10) return j({ error: 'invalid' }, 400);
+  try {
+    await ensureMsgs(env.DB);
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('m' + ip + (env.POLICY_AUD || ''))))].map(x => x.toString(16).padStart(2, '0')).join('').slice(0, 32);
+    if ((await env.DB.prepare("SELECT COUNT(*) c FROM msgs WHERE ip_hash=? AND created_at>datetime('now','-1 hour')").bind(h).first()).c >= 3) return j({ error: 'limit' }, 429);
+    if ((await env.DB.prepare("SELECT COUNT(*) c FROM msgs WHERE status='new'").first()).c >= 500) return j({ error: 'busy' }, 503);
+    const r = await env.DB.prepare('INSERT INTO msgs(name,topic,channel,contact,message,ip_hash) VALUES(?,?,?,?,?,?)').bind(name, v('topic'), ch, c, msg, h).run();
+    return j({ ok: 1, ref: 'MSG-' + String(r.meta.last_row_id).padStart(4, '0') }, 201);
+  } catch { return j({ error: 'server' }, 500); }
+}
+async function adminMsgs(request, env, id) {
+  const m = request.method, db = env.DB;
+  try {
+    await ensureMsgs(db);
+    if (m === 'GET') return j((await db.prepare('SELECT id,name,topic,channel,contact,message,status,created_at FROM msgs ORDER BY id DESC LIMIT 500').all()).results);
+    if (m === 'PUT' && id) { const b = await request.json(); if (!MSG_ST.includes(b.status)) return j({ error: 'bad' }, 400); await db.prepare('UPDATE msgs SET status=? WHERE id=?').bind(b.status, id).run(); return j({ ok: 1 }); }
+    if (m === 'DELETE' && id) { await db.prepare('DELETE FROM msgs WHERE id=?').bind(id).run(); return j({ ok: 1 }); }
+  } catch { return j({ error: 'server' }, 500); }
+  return j({ error: 'bad request' }, 400);
 }
 
 // ---------- صفحة الروابط /links (تُدار من الأدمن) ----------
@@ -651,6 +687,7 @@ export default {
     if (m === 'GET' && /^\/e\/\d+$/.test(p)) return eventPage(request, env, p.split('/')[2]);
     if (m === 'GET' && /^\/j\/\d+$/.test(p)) return jobPage(request, env, p.split('/')[2]);
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
+    if (p === '/api/contact' && m === 'POST') return contactSubmit(request, env);
     if (p === '/api/t' && m === 'POST') return track(request, env);
     if (p === '/api/orgs' && m === 'GET') return publicOrgs(env);
     if (p === '/api/certs' && m === 'GET') return publicCerts(request, env);
@@ -668,6 +705,7 @@ export default {
       if (seg[3] === 'stats') return adminStats(request, env);
       if (seg[3] === 'links') return adminLinks(request, env);
       if (seg[3] === 'bio') return adminBio(request, env, seg[4]);
+      if (seg[3] === 'msgs') return adminMsgs(request, env, seg[4]);
       if (seg[3] === 'certs') return adminCerts(request, env, seg[4]);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);
