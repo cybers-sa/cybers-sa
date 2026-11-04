@@ -11,7 +11,7 @@ en:{h:"Cybersecurity Career Paths",sub:"Pick a path, then explore its roles, lev
 src:"Roles, levels and transitions: Saudi Cybersecurity Workforce Framework (SCyWF) – National Cybersecurity Authority. Titles: public Saudi job postings.",
 grad:"Graduate with academic qualification",tech:"Cybersecurity technical roles",core:"Cybersecurity core roles",mgmt:"Management or other HR roles",lvl:"Level",levels:"levels",rng:"Levels",none:"—",goto:"Go to this level",certs:"Suitable professional certifications",certsE:"From fundamentals to expert",cc:"certifications",cb:"Beginner",ci:"Intermediate",ca:"Advanced",ar_note:"Official description (Arabic)",sum:"Role summary",tasks:"Tasks and responsibilities"}
 };
-function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 var CSS=".cp{max-width:900px;margin:0 auto}.cp *{box-sizing:border-box}.cp-h h2{margin:0 0 6px}.cp-h p{margin:0 0 18px;color:var(--muted)}"+
 ".cp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(min-width:800px){.cp-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}}"+
 ".cp-card{font:inherit;color:var(--text);text-align:start;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px;cursor:pointer;transition:.18s;min-width:0}.cp-card:hover{transform:translateY(-3px);border-color:var(--accent)}"+

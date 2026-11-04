@@ -1,6 +1,6 @@
 const dec = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const txt = b => new TextDecoder().decode(b);
-const SEC = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'Strict-Transport-Security': 'max-age=31536000' };
+const SEC = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'Strict-Transport-Security': 'max-age=31536000', 'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'", 'Cross-Origin-Opener-Policy': 'same-origin' };
 const j = (d, s = 200) => Response.json(d, { status: s });
 
 // التحقق من توقيع Cloudflare Access (يرجع null إذا سُمح)
@@ -541,7 +541,36 @@ async function adminLinks(request, env) {
 
 // ---------- رسائل التواصل (من الزوار) ----------
 const MSG_SQL = "CREATE TABLE IF NOT EXISTS msgs (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, topic TEXT, channel TEXT, contact TEXT, message TEXT, status TEXT DEFAULT 'new', ip_hash TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
-const MSG_TOPICS = ['inq', 'sug', 'par', 'rep', 'oth'], MSG_CH = ['wa', 'tg', 'em'], MSG_ST = ['new', 'done', 'closed'];
+const MSG_CH = ['wa', 'tg', 'em'], MSG_ST = ['new', 'done', 'closed'];
+const MSG_DEF = [{ id: 'inq', ar: 'استفسار', en: 'Inquiry', on: 1 }, { id: 'sug', ar: 'اقتراح', en: 'Suggestion', on: 1 }, { id: 'par', ar: 'شراكة أو رعاية', en: 'Partnership or sponsorship', on: 0 }, { id: 'rep', ar: 'بلاغ أو ملاحظة', en: 'Report or feedback', on: 1 }, { id: 'oth', ar: 'أخرى', en: 'Other', on: 1 }];
+async function msgTopics(db) {
+  try {
+    await db.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
+    const r = await db.prepare("SELECT v FROM settings WHERE k='msg_topics'").first(), saved = r ? JSON.parse(r.v) : [], out = [];
+    for (const d of MSG_DEF) { const s = saved.find(x => x.id === d.id); out.push(s ? { id: d.id, ar: s.ar || d.ar, en: s.en || d.en, on: s.on ? 1 : 0 } : { ...d }); }
+    for (const s of saved) if (!MSG_DEF.some(d => d.id === s.id) && /^[a-z0-9]{2,12}$/.test(s.id)) out.push({ id: s.id, ar: String(s.ar || '').slice(0, 40), en: String(s.en || '').slice(0, 40), on: s.on ? 1 : 0 });
+    return out;
+  } catch { return MSG_DEF.map(d => ({ ...d })); }
+}
+async function publicTopics(env) {
+  return new Response(JSON.stringify((await msgTopics(env.DB)).filter(t => t.on).map(t => ({ id: t.id, ar: t.ar, en: t.en || t.ar }))), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
+}
+async function adminTopics(request, env) {
+  try {
+    if (request.method === 'PUT') {
+      const b = await request.json(), a = Array.isArray(b.topics) ? b.topics.slice(0, 20) : [], seen = new Set(), out = [];
+      for (const t of a) {
+        const id = String(t.id || ''), ar = String(t.ar || '').trim().slice(0, 40), en = String(t.en || '').trim().slice(0, 40);
+        if (!/^[a-z0-9]{2,12}$/.test(id) || seen.has(id) || !ar) return j({ error: 'invalid' }, 400);
+        seen.add(id); out.push({ id, ar, en, on: t.on ? 1 : 0 });
+      }
+      await env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
+      await env.DB.prepare("INSERT INTO settings(k,v) VALUES('msg_topics',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify(out)).run();
+      return j({ ok: 1 });
+    }
+    return j(await msgTopics(env.DB));
+  } catch { return j({ error: 'server' }, 500); }
+}
 let msgReady = false;
 async function ensureMsgs(db) { if (msgReady) return; await db.prepare(MSG_SQL).run(); msgReady = true; }
 const contactOk = (ch, c) => ch === 'em' ? /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(c) : ch === 'wa' ? /^\+?[0-9][0-9 \-]{6,18}$/.test(c) : /^@?[A-Za-z0-9_]{4,32}$/.test(c);
@@ -552,7 +581,7 @@ async function contactSubmit(request, env) {
   if (!b.consent) return j({ error: 'consent' }, 400);
   if (Date.now() - Number(b.t || 0) < 3000) return j({ error: 'fast' }, 429);
   const v = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n), name = v('name', 80), ch = v('channel'), c = v('contact', 120), msg = v('message', 1500);
-  if (name.length < 2 || !MSG_TOPICS.includes(v('topic')) || !MSG_CH.includes(ch) || !contactOk(ch, c) || msg.length < 10) return j({ error: 'invalid' }, 400);
+  if (name.length < 2 || !(await msgTopics(env.DB)).some(t => t.on && t.id === v('topic')) || !MSG_CH.includes(ch) || !contactOk(ch, c) || msg.length < 10) return j({ error: 'invalid' }, 400);
   try {
     await ensureMsgs(env.DB);
     const ip = request.headers.get('CF-Connecting-IP') || '';
@@ -688,6 +717,7 @@ export default {
     if (m === 'GET' && /^\/j\/\d+$/.test(p)) return jobPage(request, env, p.split('/')[2]);
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
     if (p === '/api/contact' && m === 'POST') return contactSubmit(request, env);
+    if (p === '/api/topics' && m === 'GET') return publicTopics(env);
     if (p === '/api/t' && m === 'POST') return track(request, env);
     if (p === '/api/orgs' && m === 'GET') return publicOrgs(env);
     if (p === '/api/certs' && m === 'GET') return publicCerts(request, env);
@@ -706,6 +736,7 @@ export default {
       if (seg[3] === 'links') return adminLinks(request, env);
       if (seg[3] === 'bio') return adminBio(request, env, seg[4]);
       if (seg[3] === 'msgs') return adminMsgs(request, env, seg[4]);
+      if (seg[3] === 'topics') return adminTopics(request, env);
       if (seg[3] === 'certs') return adminCerts(request, env, seg[4]);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);

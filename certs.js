@@ -27,7 +27,7 @@ var CSS=".ct{max-width:980px;margin:0 auto}.ct *{box-sizing:border-box}.ct h2{ma
 ".ct-e{color:var(--muted);padding:6px 0 4px;font-size:14px}"+
 "@media(max-width:640px){.ct-lane{grid-template-columns:34px minmax(0,1fr);gap:0 10px}.ct-n{width:34px;height:34px;font-size:15px}.ct-lane::before{inset-inline-start:16px;top:34px}.ct-c{padding:11px 11px}.ct-ac{font-size:15px}}";
 function css(){if(!$("#ct-css")){var s=document.createElement("style");s.id="ct-css";s.textContent=CSS+".hero.cp-on .orgs{visibility:hidden}";document.head.appendChild(s)}}
-function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function T(){return U[L()]}
 var COL={b:"#2fb67c",i:"#4f6bed",a:"#8a4fe0"};
 function card(c,k){var t=T();return'<div class="ct-c" style="--c:'+COL[k]+'" role="button" tabindex="0" data-c="'+esc(c.a)+'"><span class="ct-is">'+esc(c.i)+'</span><span class="ct-ac">'+esc(c.a)+'</span><span class="ct-nm">'+esc(c.n)+'</span><span class="ct-go">'+t.more+" ‹</span></div>"}
