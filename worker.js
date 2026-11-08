@@ -271,6 +271,7 @@ let jobsReady = false;
 async function ensureJobs(db) {
   if (jobsReady) return;
   for (const q of [JOB_SQL, APP_SQL, CV_SQL]) await db.prepare(q).run();
+  for (const q of ['CREATE INDEX IF NOT EXISTS ix_app_job ON applications(job_id)']) { try { await db.prepare(q).run(); } catch {} }
   await ensureOrg(db);
   await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0] });
   jobsReady = true;
@@ -709,8 +710,18 @@ async function adminCerts(request, env, id) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const p = new URL(request.url).pathname, m = request.method;
+    if (m === 'GET' && /^\/api\/(events|jobs|orgs|certs|bio|topics|links)$/.test(p) && ctx && typeof caches !== 'undefined') {
+      const cache = caches.default, key = new Request(request.url, { method: 'GET' });
+      const hit = await cache.match(key); if (hit) return hit;
+      const res = await this.route(request, env, p, m);
+      if (res.status === 200) { const out = new Response(res.body, res); out.headers.set('Cache-Control', 'public, max-age=30'); ctx.waitUntil(cache.put(key, out.clone())); return out; }
+      return res;
+    }
+    return this.route(request, env, p, m);
+  },
+  async route(request, env, p, m) {
     if (m === 'GET' && (p === '/paths' || p === '/certs')) return viewPage(request, env, p);
     if (p === '/api/events' && m === 'GET') return publicEvents(env);
     if (m === 'GET' && /^\/e\/\d+$/.test(p)) return eventPage(request, env, p.split('/')[2]);
