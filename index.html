@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>سايبرز | فرص وفعاليات</title>
 <meta name="description" content="فرص وفعاليات ومعسكرات ووظائف | Opportunities, events, bootcamps and jobs">
 <link rel="canonical" href="https://cybers-sa.com/">
@@ -23,12 +23,12 @@
 --bg:#f4f4fa;--card:#fff;--text:#0b0b2a;--muted:#55557a;--line:#d9d9ee;--accent:#2a2aa8;--accent2:#5b5be0;--hero:linear-gradient(135deg,#e8e8f8,#d4d4f5)}
 :root:not([data-theme="light"]){}
 :root[data-theme="dark"]{--bg:#050514;--card:#0e0e2e;--text:#ececf4;--muted:#9a9ac4;--line:#25256a;--accent:#7b7bf0;--accent2:#a3a3ff;--hero:linear-gradient(135deg,#050514,#1c1c78)}
-html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+html{scroll-padding-top:64px;scroll-behavior:smooth}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans Arabic',system-ui,Segoe UI,Arial,sans-serif;line-height:1.7}
 a{color:inherit;text-decoration:none}
 .wrap{max-width:1080px;margin:auto;padding:0 18px}
-header{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+header{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .nav{display:flex;align-items:center;justify-content:space-between;height:62px;gap:10px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.5px}
 .brand svg{width:34px;height:34px}
@@ -168,7 +168,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
 </div>
 <label class="cs"><input type="checkbox" id="f_consent" required><span data-h="consent"></span></label>
 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn p" id="fsend" data-i="f_send"></button><button type="button" class="btn" id="fcancel" data-i="f_cancel"></button><span id="fmsg"></span></div>
-</form></dialog>
+<div class="fol" data-fol></div></form></dialog>
 
 <dialog id="cd"><form id="cf" novalidate><h2 data-i="cc_h" style="margin:0"></h2><p style="color:var(--muted);margin:6px 0 0" data-i="cc_sub"></p>
 <div class="fg">
@@ -181,7 +181,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--muted);font-s
 </div>
 <label class="cs"><input type="checkbox" id="c_consent" required><span data-h="consent"></span></label>
 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn p" id="csend" data-i="f_send"></button><button type="button" class="btn" id="ccancel" data-i="f_cancel"></button></div><div id="cmsg" style="margin-top:10px"></div>
-</form></dialog>
+<div class="fol" data-fol></div></form></dialog>
 
 <dialog id="evd"><div id="evb"></div></dialog>
 <dialog id="jd"><div id="jb"></div></dialog>
@@ -262,7 +262,7 @@ function cOpts(){const t=T[lang],o=(a,f)=>a.map(k=>`<option value="${k}">${f(k)}
  if(ch)$("#c_channel").value=ch;if(tp)$("#c_topic").value=tp;cPh()}
 function cPh(){const t=T[lang],c=$("#c_channel").value;$("#c_contact").placeholder=t["cc_ph_"+c];$("#c_contact").inputMode=c=="em"?"email":c=="wa"?"tel":"text"}
 $("#c_channel").onchange=cPh;
-function openContact(){$("#cf").classList.remove("tried");fetch("/api/topics").then(r=>r.ok?r.json():null).then(a=>{if(Array.isArray(a)&&a.length){CTOP=a;cOpts()}}).catch(()=>{});cOpts();$("#cf").reset();cPh();$("#cmsg").textContent="";$("#csend").disabled=false;CT0=Date.now();track("cm");$("#cd").showModal()}
+function openContact(){fillFol();$("#cf").classList.remove("tried");fetch("/api/topics").then(r=>r.ok?r.json():null).then(a=>{if(Array.isArray(a)&&a.length){CTOP=a;cOpts()}}).catch(()=>{});cOpts();$("#cf").reset();cPh();$("#cmsg").textContent="";$("#csend").disabled=false;CT0=Date.now();track("cm");$("#cd").showModal()}
 document.querySelectorAll("[data-contact]").forEach(a=>a.onclick=e=>{e.preventDefault();openContact()});
 $("#ccancel").onclick=()=>$("#cd").close();
 $("#cf").onsubmit=async e=>{e.preventDefault();const t=T[lang],b={t:CT0,consent:$("#c_consent").checked?1:0};
@@ -272,7 +272,7 @@ $("#cf").onsubmit=async e=>{e.preventDefault();const t=T[lang],b={t:CT0,consent:
   if(r.ok){const o=await r.json().catch(()=>({}));$("#cmsg").innerHTML=esc(t.cc_ok);$("#cf").reset();setTimeout(()=>$("#cd").close(),6000)}
   else{$("#cmsg").textContent=r.status==429?t.limit:t.cc_err;$("#csend").disabled=false}}
  catch{$("#cmsg").textContent=t.cc_err;$("#csend").disabled=false}};
-$("#openForm").onclick=()=>{$("#sf").classList.remove("tried");formOpts();$("#sf").reset();togStart();$("#fmsg").textContent="";T0=Date.now();$("#dlg").showModal()};
+$("#openForm").onclick=()=>{fillFol();$("#sf").classList.remove("tried");formOpts();$("#sf").reset();togStart();$("#fmsg").textContent="";T0=Date.now();$("#dlg").showModal()};
 $("#f_delivery").onchange=togStart;
 $("#fcancel").onclick=()=>$("#dlg").close();
 $("#sf").onsubmit=async e=>{e.preventDefault();const t=T[lang],b={t:T0};
@@ -292,7 +292,8 @@ const okey=e=>String(e.org||"").split("|")[0].trim().toLowerCase();
 function renderOrgs(){const box=$("#orgs");if(!ORGS.length){box.classList.remove("show");return}
  box.classList.add("show");box.innerHTML=`<small>${T[lang].orgsT}</small><div class="orl">${ORGS.map(o=>{const k=o.name.toLowerCase(),n=lang=="en"&&o.en?o.en:o.name;return`<button class="op ${orgF==k?"on":""}" data-o="${esc(k)}" aria-pressed="${orgF==k}">${o.logo?`<img src="${esc(o.logo)}" alt="">`:`<i>${esc(n.slice(0,1))}</i>`}<span>${esc(n)}</span></button>`}).join("")}</div>`}
 $("#orgs").addEventListener("click",e=>{const b=e.target.closest(".op");if(!b)return;orgF=orgF==b.dataset.o?"":b.dataset.o;renderOrgs();list();jlist();$("#browse").click()});
-function renderSoc(){$("#soc").innerHTML=socHtml()}
+function fillFol(){const h=socHtml(),t=T[lang];document.querySelectorAll("[data-fol]").forEach(e=>{e.style.display=h?"":"none";e.innerHTML=h?`<span>${t.follow}</span><div class="soc">${h}</div>`:""})}
+function renderSoc(){$("#soc").innerHTML=socHtml();fillFol()}
 function track(k,key){try{const b=JSON.stringify({k,key:key==null?"":String(key)});if(!(navigator.sendBeacon&&navigator.sendBeacon("/api/t",new Blob([b],{type:"application/json"}))))fetch("/api/t",{method:"POST",body:b,keepalive:true,headers:{"Content-Type":"application/json"}})}catch{}}
 async function copyEv(id,btn,p="e"){const u=location.origin+"/"+p+"/"+id,o=btn.innerHTML;try{await navigator.clipboard.writeText(u)}catch{prompt("",u);return}track("sh",p+":"+id);btn.textContent=btn.classList.contains("go")?"✓":T[lang].copied;setTimeout(()=>{btn.innerHTML=o},2000)}
 function openEv(id){const e=D.find(x=>x.id==id);if(!e)return;track("ev",id);const t=T[lang],s=st(e),op=s=="open"||s=="soon",d=e.desc&&e.desc[lang];
@@ -349,7 +350,7 @@ function wiz(msg,ok){const t=T[lang],n=asteps(),s=AP.step,d=AP.d,v=x=>esc(d[x]||
   h=`<div><label>${t.jf_job}</label><select id="a_job">${opts}</select></div><div><label>${t.jf_name} *</label><input id="a_name" name="name" autocomplete="name" maxlength="100" value="${v("name")}"></div><div><label>${t.jf_email} *</label><input id="a_email" name="email" autocomplete="email" type="email" dir="ltr" maxlength="200" value="${v("email")}"></div><div><label>${t.jf_phone} *</label><input id="a_phone" name="tel" autocomplete="tel" type="tel" dir="ltr" maxlength="20" placeholder="+966" value="${v("phone")}"></div><div><label>${t.jf_li}</label><input id="a_li" name="url" autocomplete="url" dir="ltr" maxlength="200" placeholder="https://linkedin.com/in/" value="${v("li")}"></div>`}
  else if(s==2){h=`<div><label>${t.jf_up} *</label><label class="upl"><input type="file" id="a_cv" accept=".pdf,.doc,.docx"><span id="a_fn">${AP.file?esc(AP.file.name):"⬆ "+t.jf_up}</span></label><small style="color:var(--muted)">${t.jf_max}</small></div><div><label>${t.jf_years} *</label><input id="a_years" type="number" min="0" max="60" step="1" inputmode="numeric" value="${v("years")}"></div>`}
  else{h=AP.job.q.map((q,i)=>`<div><label style="color:var(--text);font-size:15px">${esc(qt(q))} *</label><select data-q="${i}"><option value="">${t.sel}</option><option value="y" ${d.ans&&d.ans[i]=="y"?"selected":""}>${t.yes}</option><option value="n" ${d.ans&&d.ans[i]=="n"?"selected":""}>${t.no}</option></select></div>`).join("")}
- $("#jb").innerHTML=`<h2 style="margin:0 0 2px">${esc(AP.job.title[lang])}</h2><div class="stp"><b>${t["j"+s]}</b><span>${t.jstep.replace("{a}",s).replace("{b}",n)}</span></div><div class="bar"><i style="width:${s/n*100}%"></i></div><div class="jf">${h}</div>${s==n?`<label class="cs"><input type="checkbox" id="a_consent" ${d.consent?"checked":""}><span>${t.consent}</span></label>`:""}<input class="hp" id="a_web" tabindex="-1" autocomplete="off" aria-hidden="true"><div class="jm ${ok?"ok":""}" id="jmsg">${msg||""}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${s>1?`<button class="btn" id="a_back">${t.back}</button>`:`<button class="btn" id="a_x">${t.back}</button>`}<button class="btn p" id="a_next">${s==n?t.jsend:t.next}</button></div>`;
+ $("#jb").innerHTML=`<h2 style="margin:0 0 2px">${esc(AP.job.title[lang])}</h2><div class="stp"><b>${t["j"+s]}</b><span>${t.jstep.replace("{a}",s).replace("{b}",n)}</span></div><div class="bar"><i style="width:${s/n*100}%"></i></div><div class="jf">${h}</div>${s==n?`<label class="cs"><input type="checkbox" id="a_consent" ${d.consent?"checked":""}><span>${t.consent}</span></label>`:""}<input class="hp" id="a_web" tabindex="-1" autocomplete="off" aria-hidden="true"><div class="jm ${ok?"ok":""}" id="jmsg">${msg||""}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${s>1?`<button class="btn" id="a_back">${t.back}</button>`:`<button class="btn" id="a_x">${t.back}</button>`}<button class="btn p" id="a_next">${s==n?t.jsend:t.next}</button></div>${fol(t)}`;
  if($("#a_cv"))$("#a_cv").onchange=e=>{AP.file=e.target.files[0]||null;$("#a_fn").textContent=AP.file?AP.file.name:"⬆ "+t.jf_up};
  if($("#a_x")&&AP.step==1)$("#a_x").onclick=()=>{grab();openJob(AP.job.id)};
  if($("#a_back"))$("#a_back").onclick=()=>{grab();AP.step--;wiz()};
@@ -363,7 +364,7 @@ async function nextStep(){const t=T[lang],n=asteps();grab();const d=AP.d,bad=m=>
  const f=new FormData();f.set("job_id",AP.job.id);f.set("name",d.name);f.set("email",d.email);f.set("phone",d.phone||"");f.set("linkedin",d.li||"");f.set("years",d.years);f.set("answers",JSON.stringify(d.ans||[]));f.set("t",AP.t0);f.set("website",$("#a_web").value);f.set("consent","1");f.set("cv",AP.file);
  $("#a_next").disabled=true;
  try{const r=await fetch("/api/apply",{method:"POST",body:f});
-  if(r.ok){$("#jb").innerHTML=`<h2 style="margin:0 0 12px">${esc(AP.job.title[lang])}</h2><p class="jm ok" style="font-size:16px">${t.jsent}</p><button class="btn" id="a_x">${t.close}</button>`;$("#a_x").onclick=()=>$("#jd").close();return}
+  if(r.ok){$("#jb").innerHTML=`<h2 style="margin:0 0 12px">${esc(AP.job.title[lang])}</h2><p class="jm ok" style="font-size:16px">${t.jsent}</p><button class="btn" id="a_x">${t.close}</button>${fol(t)}`;$("#a_x").onclick=()=>$("#jd").close();return}
   const e=await r.json().catch(()=>({}));wiz(r.status==409?(e.error=="dup"?t.jdup:t.jclosed):r.status==429?t.limit:t.jerr)}
  catch{wiz(t.jerr)}}
 $("#evb").addEventListener("click",e=>{const m=location.pathname.match(/^\/e\/(\d+)/);if(m&&e.target.closest("a.btn.p"))track("reg",m[1])});
