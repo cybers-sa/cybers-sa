@@ -334,13 +334,14 @@ const afcfgClean = c => {
     const e = {};
     if (v.on === 0 || v.on === 1) e.on = v.on;
     if (v.opts && typeof v.opts === 'object') { const o = {}; for (const [k, x] of Object.entries(v.opts).slice(0, 30)) if (/^[a-z0-9]{1,12}$/.test(k) && (x === 0 || x === 1)) o[k] = x; if (Object.keys(o).length) e.opts = o; }
+    if (Array.isArray(v.add)) { const sd = new Set(), ad = []; for (const x of v.add.slice(0, 20)) { const id = String(x.id || ''), ar = String(x.ar || '').trim().slice(0, 60); if (/^[a-z0-9]{1,12}$/.test(id) && !sd.has(id) && ar) { sd.add(id); ad.push({ id, ar, en: String(x.en || '').trim().slice(0, 60) }); } } if (ad.length) e.add = ad; }
     if (Object.keys(e).length) out[fid] = e;
   }
   return JSON.stringify(out);
 };
 const afEff = (fields, cfgStr) => {
   let c = {}; try { c = JSON.parse(cfgStr || '{}') || {}; } catch {}
-  return fields.map(f => { const k = c[f.id] || {}; return { ...f, on: k.on === 0 || k.on === 1 ? k.on : f.on, opts: f.opts.map(o => ({ ...o, on: k.opts && (k.opts[o.id] === 0 || k.opts[o.id] === 1) ? k.opts[o.id] : o.on })) }; });
+  return fields.map(f => { const k = c[f.id] || {}; return { ...f, on: k.on === 0 || k.on === 1 ? k.on : f.on, opts: f.opts.map(o => ({ ...o, on: k.opts && (k.opts[o.id] === 0 || k.opts[o.id] === 1) ? k.opts[o.id] : o.on })).concat(f.type === 'select' ? (k.add || []).filter(a => !f.opts.some(o => o.id === a.id)).map(a => ({ id: a.id, ar: a.ar, en: a.en, on: k.opts && k.opts[a.id] === 0 ? 0 : 1 })) : []) }; });
 };
 const nomsClean = a => (Array.isArray(a) ? a : []).slice(0, 12).map(n => ({ org: String(n.org || '').trim().slice(0, 60), date: DATE.test(String(n.date || '')) ? String(n.date) : todayRiyadh(), note: String(n.note || '').trim().slice(0, 200) })).filter(n => n.org);
 const jq = s => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
