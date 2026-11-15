@@ -352,7 +352,7 @@ async function publicJobs(env) {
   await ensureJobs(env.DB);
   const r = await env.DB.prepare("SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id=j.id) n, o.id oid, o.updated ou, (o.logo IS NOT NULL AND o.logo!='') hl FROM jobs j LEFT JOIN organizers o ON o.name=trim(CASE WHEN instr(j.org,'|')>0 THEN substr(j.org,1,instr(j.org,'|')-1) ELSE j.org END) WHERE j.published=1 AND (j.deadline IS NULL OR j.deadline='' OR j.deadline>=?) ORDER BY j.id DESC").bind(todayRiyadh()).all();
   return Response.json(r.results.map(e => ({
-    id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, place: e.place || '', mode: e.mode === 'online' ? 'online' : 'onsite', kind: e.kind,
+    id: e.id, title: { ar: e.title_ar, en: e.title_en || e.title_ar }, org: e.org, city: e.city, place: e.place || '', mode: e.mode === 'online' ? 'online' : e.mode === '' ? '' : 'onsite', kind: e.kind,
     deadline: e.deadline || '', closed: !!e.closed || (Number(e.max_apps) > 0 && e.n >= Number(e.max_apps)), exp: e.exp || '', created: e.created_at || '', ref: 'CYB-' + String(e.created_at || '').slice(0, 4) + '-' + String(e.id).padStart(3, '0'), desc: { ar: e.desc_ar || '', en: e.desc_en || e.desc_ar || '' }, q: jq(e.questions),
     logo: e.hl ? '/api/logo/' + e.oid + '?v=' + e.ou : '', link: /^https?:\/\//i.test(e.link || '') ? e.link : '', pin: Number(e.pinned) === 1
   })), { headers: { 'Cache-Control': 'no-store' } });
@@ -422,8 +422,8 @@ async function apply(request, env) {
 function jclean(b) {
   const s = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n);
   const qs = (Array.isArray(b.questions) ? b.questions : []).map(x => String(x).trim().slice(0, 250)).filter(Boolean).slice(0, 10);
-  return [s('title_ar'), s('title_en'), s('org'), CITIES.concat('x').includes(b.city) ? b.city : 'r', JMODES.includes(b.mode) ? b.mode : 'onsite',
-    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0)), b.pinned ? 1 : 0, /^[a-z0-9]{2,12}$/.test(s('rspec')) ? s('rspec') : '', Math.min(60, Math.max(0, Number(b.ryears) || 0)), afcfgClean(b.afcfg)];
+  return [s('title_ar'), s('title_en'), s('org'), b.city === '' ? '' : CITIES.concat('x').includes(b.city) ? b.city : 'r', b.mode === '' ? '' : JMODES.includes(b.mode) ? b.mode : 'onsite',
+    b.kind === '' ? '' : KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0)), b.pinned ? 1 : 0, /^[a-z0-9]{2,12}$/.test(s('rspec')) ? s('rspec') : '', Math.min(60, Math.max(0, Number(b.ryears) || 0)), afcfgClean(b.afcfg)];
 }
 const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps,pinned,rspec,ryears,afcfg'.split(',');
 async function adminJobs(request, env, id) {
