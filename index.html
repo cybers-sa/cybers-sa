@@ -337,9 +337,9 @@ function openJob(id){const j=JD.find(x=>x.id==id);if(!j)return;track("jo",id);co
 $("#jd").addEventListener("close",()=>{if(location.pathname.startsWith("/j/"))history.replaceState(null,"","/#jobs")});
 const AP={job:null,step:1,d:{},file:null,t0:0};
 const prof=()=>{try{return JSON.parse(localStorage.getItem("cs_prof")||"{}")}catch{return{}}};
-let AF=[];async function loadAF(){try{const r=await fetch("/api/afields");if(r.ok)AF=await r.json()}catch{}}
+let AF=[];async function loadAF(id){try{const r=await fetch("/api/afields?job="+encodeURIComponent(id));if(r.ok)AF=await r.json()}catch{}}
 function afHtml(){const t=T[lang],d=AP.d.x||{};return AF.map(f=>`<div><label>${esc(lang=="en"?f.en:f.ar)}${f.req?" *":""}</label>${f.type=="select"?`<select data-af="${f.id}"><option value="">${t.sel}</option>${f.opts.map(o=>`<option value="${o.id}" ${d[f.id]==o.id?"selected":""}>${esc(lang=="en"?o.en:o.ar)}</option>`).join("")}</select>`:`<input data-af="${f.id}" ${f.type=="number"?'type="number" min="0" inputmode="numeric"':'maxlength="100"'} value="${esc(d[f.id]||"")}">`}</div>`).join("")}
-async function startApply(id){track("ja",id);await loadAF();AP.job=JD.find(x=>x.id==id);AP.step=1;AP.d=prof();AP.file=null;AP.t0=Date.now();wiz();if(!$("#jd").open)$("#jd").showModal()}
+async function startApply(id){track("ja",id);await loadAF(id);AP.job=JD.find(x=>x.id==id);AP.step=1;AP.d=prof();AP.file=null;AP.t0=Date.now();wiz();if(!$("#jd").open)$("#jd").showModal()}
 const asteps=()=>AP.job&&AP.job.q.length?3:2;
 function grab(){const g=i=>$("#"+i)?$("#"+i).value.trim():undefined,d=AP.d;
  if(AP.step==1){d.name=g("a_name");d.email=g("a_email");d.phone=g("a_phone");d.li=g("a_li");const jid=g("a_job");if(jid&&(!AP.job||AP.job.id!=jid))AP.job=JD.find(x=>x.id==jid)}

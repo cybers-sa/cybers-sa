@@ -273,7 +273,7 @@ async function ensureJobs(db) {
   for (const q of [JOB_SQL, APP_SQL, CV_SQL]) await db.prepare(q).run();
   for (const q of ['CREATE INDEX IF NOT EXISTS ix_app_job ON applications(job_id)']) { try { await db.prepare(q).run(); } catch {} }
   await ensureOrg(db);
-  await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0], rspec: '', ryears: ['REAL', 0] });
+  await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0], rspec: '', ryears: ['REAL', 0], afcfg: '{}' });
   await addCols(db, 'applications', { extra: '{}', noms: '[]' });
   jobsReady = true;
 }
@@ -309,8 +309,9 @@ async function afList(db) {
     return c && c.length ? c : AF_DEF.map(f => ({ ...f, opts: f.opts.map(o => ({ ...o })) }));
   } catch { return AF_DEF.map(f => ({ ...f, opts: f.opts.map(o => ({ ...o })) })); }
 }
-async function publicAf(env) {
-  const l = (await afList(env.DB)).filter(f => f.on).map(f => ({ id: f.id, ar: f.ar, en: f.en || f.ar, type: f.type, req: f.req, opts: f.opts.filter(o => o.on).map(o => ({ id: o.id, ar: o.ar, en: o.en || o.ar })) }));
+async function publicAf(env, jobId) {
+  let cfg = '{}'; if (/^\d{1,10}$/.test(jobId || '')) { const r = await env.DB.prepare('SELECT afcfg FROM jobs WHERE id=?').bind(jobId).first(); if (r) cfg = r.afcfg; }
+  const l = afEff(await afList(env.DB), cfg).filter(f => f.on).map(f => ({ id: f.id, ar: f.ar, en: f.en || f.ar, type: f.type, req: f.req, opts: f.opts.filter(o => o.on).map(o => ({ id: o.id, ar: o.ar, en: o.en || o.ar })) }));
   return new Response(JSON.stringify(l), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
 }
 async function adminAf(request, env) {
@@ -325,6 +326,22 @@ async function adminAf(request, env) {
     return j(await afList(env.DB));
   } catch { return j({ error: 'server' }, 500); }
 }
+const afcfgClean = c => {
+  if (typeof c === 'string') { try { c = JSON.parse(c); } catch { c = {}; } }
+  const out = {};
+  if (c && typeof c === 'object') for (const [fid, v] of Object.entries(c).slice(0, 12)) {
+    if (!/^[a-z0-9]{2,12}$/.test(fid) || !v || typeof v !== 'object') continue;
+    const e = {};
+    if (v.on === 0 || v.on === 1) e.on = v.on;
+    if (v.opts && typeof v.opts === 'object') { const o = {}; for (const [k, x] of Object.entries(v.opts).slice(0, 30)) if (/^[a-z0-9]{1,12}$/.test(k) && (x === 0 || x === 1)) o[k] = x; if (Object.keys(o).length) e.opts = o; }
+    if (Object.keys(e).length) out[fid] = e;
+  }
+  return JSON.stringify(out);
+};
+const afEff = (fields, cfgStr) => {
+  let c = {}; try { c = JSON.parse(cfgStr || '{}') || {}; } catch {}
+  return fields.map(f => { const k = c[f.id] || {}; return { ...f, on: k.on === 0 || k.on === 1 ? k.on : f.on, opts: f.opts.map(o => ({ ...o, on: k.opts && (k.opts[o.id] === 0 || k.opts[o.id] === 1) ? k.opts[o.id] : o.on })) }; });
+};
 const nomsClean = a => (Array.isArray(a) ? a : []).slice(0, 12).map(n => ({ org: String(n.org || '').trim().slice(0, 60), date: DATE.test(String(n.date || '')) ? String(n.date) : todayRiyadh(), note: String(n.note || '').trim().slice(0, 200) })).filter(n => n.org);
 const jq = s => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
 const b64 = u => { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
@@ -349,7 +366,8 @@ async function apply(request, env) {
   const v = (k, n = 200) => String(f.get(k) ?? '').trim().slice(0, n);
   const years = Number(v('years')), cv = f.get('cv');
   const extra = {};
-  for (const fl of (await afList(env.DB)).filter(x => x.on)) {
+  const jr = await env.DB.prepare('SELECT afcfg FROM jobs WHERE id=?').bind(v('job_id', 20)).first();
+  for (const fl of afEff(await afList(env.DB), jr && jr.afcfg).filter(x => x.on)) {
     const val = v('x_' + fl.id, 100);
     if (!val) { if (fl.req) return j({ error: 'invalid' }, 400); continue; }
     if (fl.type === 'select' && !fl.opts.some(o => o.on && o.id === val)) return j({ error: 'invalid' }, 400);
@@ -404,9 +422,9 @@ function jclean(b) {
   const s = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n);
   const qs = (Array.isArray(b.questions) ? b.questions : []).map(x => String(x).trim().slice(0, 250)).filter(Boolean).slice(0, 10);
   return [s('title_ar'), s('title_en'), s('org'), CITIES.concat('x').includes(b.city) ? b.city : 'r', JMODES.includes(b.mode) ? b.mode : 'onsite',
-    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0)), b.pinned ? 1 : 0, /^[a-z0-9]{2,12}$/.test(s('rspec')) ? s('rspec') : '', Math.min(60, Math.max(0, Number(b.ryears) || 0))];
+    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0)), b.pinned ? 1 : 0, /^[a-z0-9]{2,12}$/.test(s('rspec')) ? s('rspec') : '', Math.min(60, Math.max(0, Number(b.ryears) || 0)), afcfgClean(b.afcfg)];
 }
-const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps,pinned,rspec,ryears'.split(',');
+const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps,pinned,rspec,ryears,afcfg'.split(',');
 async function adminJobs(request, env, id) {
   const m = request.method, db = env.DB;
   try {
@@ -788,7 +806,7 @@ export default {
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
     if (p === '/api/contact' && m === 'POST') return contactSubmit(request, env);
     if (p === '/api/topics' && m === 'GET') return publicTopics(env);
-    if (p === '/api/afields' && m === 'GET') return publicAf(env);
+    if (p === '/api/afields' && m === 'GET') return publicAf(env, new URL(request.url).searchParams.get('job'));
     if (p === '/api/t' && m === 'POST') return track(request, env);
     if (p === '/api/orgs' && m === 'GET') return publicOrgs(env);
     if (p === '/api/certs' && m === 'GET') return publicCerts(request, env);
