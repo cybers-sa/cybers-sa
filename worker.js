@@ -273,9 +273,59 @@ async function ensureJobs(db) {
   for (const q of [JOB_SQL, APP_SQL, CV_SQL]) await db.prepare(q).run();
   for (const q of ['CREATE INDEX IF NOT EXISTS ix_app_job ON applications(job_id)']) { try { await db.prepare(q).run(); } catch {} }
   await ensureOrg(db);
-  await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0] });
+  await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0], rspec: '', ryears: ['REAL', 0] });
+  await addCols(db, 'applications', { extra: '{}', noms: '[]' });
   jobsReady = true;
 }
+
+// ---------- خانات نموذج التقديم (تُدار من الأدمن: إضافة / إخفاء / إلزام) ----------
+const SPEC_OPTS = [['grc', 'الحوكمة والمخاطر والالتزام (GRC)', 'Governance, Risk & Compliance (GRC)'], ['soc', 'مركز العمليات / الفريق الأزرق', 'SOC / Blue Team'], ['red', 'الفريق الأحمر واختبار الاختراق', 'Red Team / Pentesting'], ['cloud', 'أمن السحابة', 'Cloud Security'], ['ot', 'أمن أنظمة التحكم الصناعي (OT/ICS)', 'OT/ICS Security'], ['app', 'أمن التطبيقات', 'Application Security'], ['dfir', 'التحقيق الرقمي والاستجابة للحوادث', 'DFIR'], ['net', 'أمن الشبكات والبنية التحتية', 'Network & Infrastructure Security'], ['arch', 'هندسة واستشارات الأمن', 'Security Architecture & Consulting'], ['new', 'مبتدئ / طالب', 'Beginner / Student']].map(([id, ar, en]) => ({ id, ar, en, on: 1 }));
+const AF_DEF = [
+  { id: 'spec', ar: 'التخصص / المسار', en: 'Specialty / track', type: 'select', req: 1, on: 1, opts: SPEC_OPTS },
+  { id: 'city', ar: 'المدينة', en: 'City', type: 'text', req: 0, on: 0, opts: [] },
+  { id: 'avail', ar: 'الجاهزية للانضمام', en: 'Availability', type: 'select', req: 0, on: 0, opts: [{ id: 'now', ar: 'فورًا', en: 'Immediately', on: 1 }, { id: 'm1', ar: 'خلال شهر', en: 'Within a month', on: 1 }, { id: 'm3', ar: 'خلال 3 أشهر', en: 'Within 3 months', on: 1 }] },
+];
+const afClean = a => {
+  const seen = new Set(), out = [];
+  for (const f of (Array.isArray(a) ? a : []).slice(0, 12)) {
+    const id = String(f.id || ''), ar = String(f.ar || '').trim().slice(0, 60), type = ['select', 'text', 'number'].includes(f.type) ? f.type : 'text';
+    if (!/^[a-z0-9]{2,12}$/.test(id) || seen.has(id) || !ar) return null;
+    seen.add(id);
+    const os = new Set(), opts = [];
+    if (type === 'select') for (const o of (Array.isArray(f.opts) ? f.opts : []).slice(0, 30)) {
+      const oid = String(o.id || ''), oar = String(o.ar || '').trim().slice(0, 60);
+      if (!/^[a-z0-9]{1,12}$/.test(oid) || os.has(oid) || !oar) return null;
+      os.add(oid); opts.push({ id: oid, ar: oar, en: String(o.en || '').trim().slice(0, 60), on: o.on ? 1 : 0 });
+    }
+    out.push({ id, ar, en: String(f.en || '').trim().slice(0, 60), type, req: f.req ? 1 : 0, on: f.on ? 1 : 0, opts });
+  }
+  return out;
+};
+async function afList(db) {
+  try {
+    await db.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
+    const r = await db.prepare("SELECT v FROM settings WHERE k='afields'").first();
+    const c = r ? afClean(JSON.parse(r.v)) : null;
+    return c && c.length ? c : AF_DEF.map(f => ({ ...f, opts: f.opts.map(o => ({ ...o })) }));
+  } catch { return AF_DEF.map(f => ({ ...f, opts: f.opts.map(o => ({ ...o })) })); }
+}
+async function publicAf(env) {
+  const l = (await afList(env.DB)).filter(f => f.on).map(f => ({ id: f.id, ar: f.ar, en: f.en || f.ar, type: f.type, req: f.req, opts: f.opts.filter(o => o.on).map(o => ({ id: o.id, ar: o.ar, en: o.en || o.ar })) }));
+  return new Response(JSON.stringify(l), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
+}
+async function adminAf(request, env) {
+  try {
+    if (request.method === 'PUT') {
+      const c = afClean((await request.json()).fields);
+      if (!c) return j({ error: 'invalid' }, 400);
+      await env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
+      await env.DB.prepare("INSERT INTO settings(k,v) VALUES('afields',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify(c)).run();
+      return j({ ok: 1 });
+    }
+    return j(await afList(env.DB));
+  } catch { return j({ error: 'server' }, 500); }
+}
+const nomsClean = a => (Array.isArray(a) ? a : []).slice(0, 12).map(n => ({ org: String(n.org || '').trim().slice(0, 60), date: DATE.test(String(n.date || '')) ? String(n.date) : todayRiyadh(), note: String(n.note || '').trim().slice(0, 200) })).filter(n => n.org);
 const jq = s => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
 const b64 = u => { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
 const todayRiyadh = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
@@ -298,6 +348,14 @@ async function apply(request, env) {
   if (Date.now() - Number(f.get('t') || 0) < 4000) return j({ error: 'fast' }, 429);
   const v = (k, n = 200) => String(f.get(k) ?? '').trim().slice(0, n);
   const years = Number(v('years')), cv = f.get('cv');
+  const extra = {};
+  for (const fl of (await afList(env.DB)).filter(x => x.on)) {
+    const val = v('x_' + fl.id, 100);
+    if (!val) { if (fl.req) return j({ error: 'invalid' }, 400); continue; }
+    if (fl.type === 'select' && !fl.opts.some(o => o.on && o.id === val)) return j({ error: 'invalid' }, 400);
+    if (fl.type === 'number' && !(Number(val) >= 0 && Number(val) <= 100000)) return j({ error: 'invalid' }, 400);
+    extra[fl.id] = val;
+  }
   if (v('name').length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('email')) || !(years >= 0 && years <= 60) || v('years') === ''
     || !/^[0-9+\s()-]{6,20}$/.test(v('phone')) || (v('linkedin') && !/^https?:\/\//i.test(v('linkedin')))
     || !cv || typeof cv === 'string') return j({ error: 'invalid' }, 400);
@@ -326,8 +384,8 @@ async function apply(request, env) {
     const recent = await db.prepare("SELECT COUNT(*) c FROM applications WHERE ip_hash=? AND created_at>datetime('now','-1 hour')").bind(h).first();
     if (recent.c >= 5) return j({ error: 'limit' }, 429);
     const cvName = String(cv.name).replace(/[\r\n]/g, ' ').slice(0, 120);
-    const r = await db.prepare('INSERT INTO applications(job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_type,cv_size,ip_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(job.id, job.title_ar, v('name', 100), v('email'), v('phone', 20), v('linkedin'), years, JSON.stringify(qs.map((q, i) => ({ q, a: ans[i] }))), cvName, ct, buf.length, h).run();
+    const r = await db.prepare('INSERT INTO applications(job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_type,cv_size,ip_hash,extra) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(job.id, job.title_ar, v('name', 100), v('email'), v('phone', 20), v('linkedin'), years, JSON.stringify(qs.map((q, i) => ({ q, a: ans[i] }))), cvName, ct, buf.length, h, JSON.stringify(extra)).run();
     const id = r.meta.last_row_id;
     try {
       for (let i = 0, n = 0; i < buf.length; i += CH, n++)
@@ -346,9 +404,9 @@ function jclean(b) {
   const s = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n);
   const qs = (Array.isArray(b.questions) ? b.questions : []).map(x => String(x).trim().slice(0, 250)).filter(Boolean).slice(0, 10);
   return [s('title_ar'), s('title_en'), s('org'), CITIES.concat('x').includes(b.city) ? b.city : 'r', JMODES.includes(b.mode) ? b.mode : 'onsite',
-    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0)), b.pinned ? 1 : 0];
+    KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0)), b.pinned ? 1 : 0, /^[a-z0-9]{2,12}$/.test(s('rspec')) ? s('rspec') : '', Math.min(60, Math.max(0, Number(b.ryears) || 0))];
 }
-const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps,pinned'.split(',');
+const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps,pinned,rspec,ryears'.split(',');
 async function adminJobs(request, env, id) {
   const m = request.method, db = env.DB;
   try {
@@ -374,11 +432,12 @@ async function adminApps(request, env, id) {
   const m = request.method, db = env.DB;
   try {
     await ensureJobs(db);
-    if (m === 'GET') return j((await db.prepare('SELECT id,job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_size,status,note,created_at FROM applications ORDER BY id DESC').all()).results.map(r => ({ ...r, answers: (() => { try { return JSON.parse(r.answers || '[]'); } catch { return []; } })() })));
+    if (m === 'GET') return j((await db.prepare('SELECT id,job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_size,status,note,created_at,extra,noms FROM applications ORDER BY id DESC').all()).results.map(r => ({ ...r, extra: (() => { try { return JSON.parse(r.extra || '{}'); } catch { return {}; } })(), noms: (() => { try { return JSON.parse(r.noms || '[]'); } catch { return []; } })(), answers: (() => { try { return JSON.parse(r.answers || '[]'); } catch { return []; } })() })));
     if (m === 'PUT' && id) {
       const b = await request.json();
       if (!ASTAT.includes(b.status)) return j({ error: 'bad' }, 400);
       await db.prepare('UPDATE applications SET status=?, note=? WHERE id=?').bind(b.status, String(b.note ?? '').slice(0, 500), id).run();
+      if (Array.isArray(b.noms)) await db.prepare('UPDATE applications SET noms=? WHERE id=?').bind(JSON.stringify(nomsClean(b.noms)), id).run();
       return j({ ok: 1 });
     }
     if (m === 'POST' && id === 'bulk') {       // حذف مجموعة طلبات وسيرها
@@ -712,7 +771,7 @@ async function adminCerts(request, env, id) {
 export default {
   async fetch(request, env, ctx) {
     const p = new URL(request.url).pathname, m = request.method;
-    if (m === 'GET' && /^\/api\/(events|jobs|orgs|certs|bio|topics|links)$/.test(p) && ctx && typeof caches !== 'undefined') {
+    if (m === 'GET' && /^\/api\/(events|jobs|orgs|certs|bio|topics|links|afields)$/.test(p) && ctx && typeof caches !== 'undefined') {
       const cache = caches.default, key = new Request(request.url, { method: 'GET' });
       const hit = await cache.match(key); if (hit) return hit;
       const res = await this.route(request, env, p, m);
@@ -729,6 +788,7 @@ export default {
     if (p === '/api/submit' && m === 'POST') return submit(request, env);
     if (p === '/api/contact' && m === 'POST') return contactSubmit(request, env);
     if (p === '/api/topics' && m === 'GET') return publicTopics(env);
+    if (p === '/api/afields' && m === 'GET') return publicAf(env);
     if (p === '/api/t' && m === 'POST') return track(request, env);
     if (p === '/api/orgs' && m === 'GET') return publicOrgs(env);
     if (p === '/api/certs' && m === 'GET') return publicCerts(request, env);
@@ -748,6 +808,7 @@ export default {
       if (seg[3] === 'bio') return adminBio(request, env, seg[4]);
       if (seg[3] === 'msgs') return adminMsgs(request, env, seg[4]);
       if (seg[3] === 'topics') return adminTopics(request, env);
+      if (seg[3] === 'afields') return adminAf(request, env);
       if (seg[3] === 'certs') return adminCerts(request, env, seg[4]);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);

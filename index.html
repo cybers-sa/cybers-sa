@@ -337,18 +337,20 @@ function openJob(id){const j=JD.find(x=>x.id==id);if(!j)return;track("jo",id);co
 $("#jd").addEventListener("close",()=>{if(location.pathname.startsWith("/j/"))history.replaceState(null,"","/#jobs")});
 const AP={job:null,step:1,d:{},file:null,t0:0};
 const prof=()=>{try{return JSON.parse(localStorage.getItem("cs_prof")||"{}")}catch{return{}}};
-function startApply(id){track("ja",id);AP.job=JD.find(x=>x.id==id);AP.step=1;AP.d=prof();AP.file=null;AP.t0=Date.now();wiz();if(!$("#jd").open)$("#jd").showModal()}
+let AF=[];async function loadAF(){try{const r=await fetch("/api/afields");if(r.ok)AF=await r.json()}catch{}}
+function afHtml(){const t=T[lang],d=AP.d.x||{};return AF.map(f=>`<div><label>${esc(lang=="en"?f.en:f.ar)}${f.req?" *":""}</label>${f.type=="select"?`<select data-af="${f.id}"><option value="">${t.sel}</option>${f.opts.map(o=>`<option value="${o.id}" ${d[f.id]==o.id?"selected":""}>${esc(lang=="en"?o.en:o.ar)}</option>`).join("")}</select>`:`<input data-af="${f.id}" ${f.type=="number"?'type="number" min="0" inputmode="numeric"':'maxlength="100"'} value="${esc(d[f.id]||"")}">`}</div>`).join("")}
+async function startApply(id){track("ja",id);await loadAF();AP.job=JD.find(x=>x.id==id);AP.step=1;AP.d=prof();AP.file=null;AP.t0=Date.now();wiz();if(!$("#jd").open)$("#jd").showModal()}
 const asteps=()=>AP.job&&AP.job.q.length?3:2;
 function grab(){const g=i=>$("#"+i)?$("#"+i).value.trim():undefined,d=AP.d;
  if(AP.step==1){d.name=g("a_name");d.email=g("a_email");d.phone=g("a_phone");d.li=g("a_li");const jid=g("a_job");if(jid&&(!AP.job||AP.job.id!=jid))AP.job=JD.find(x=>x.id==jid)}
- if(AP.step==2){d.years=g("a_years")}
+ if(AP.step==2){d.years=g("a_years");d.x={};document.querySelectorAll("#jb [data-af]").forEach(e=>d.x[e.dataset.af]=e.value.trim())}
  if(AP.step==3){d.ans=[...document.querySelectorAll("#jb select[data-q]")].map(x=>x.value)}
  if($("#a_consent"))d.consent=$("#a_consent").checked;
  try{localStorage.setItem("cs_prof",JSON.stringify({name:d.name||"",email:d.email||"",phone:d.phone||"",li:d.li||"",years:d.years||""}))}catch{}}
 function wiz(msg,ok){const t=T[lang],n=asteps(),s=AP.step,d=AP.d,v=x=>esc(d[x]||"");let h="";
  if(s==1){const opts=JD.filter(j=>!j.link&&jst(j)!="closed"&&jst(j)!="ended").map(j=>`<option value="${j.id}" ${AP.job&&AP.job.id==j.id?"selected":""}>${esc(j.title[lang])}</option>`).join("");
   h=`<div><label>${t.jf_job}</label><select id="a_job">${opts}</select></div><div><label>${t.jf_name} *</label><input id="a_name" name="name" autocomplete="name" maxlength="100" value="${v("name")}"></div><div><label>${t.jf_email} *</label><input id="a_email" name="email" autocomplete="email" type="email" dir="ltr" maxlength="200" value="${v("email")}"></div><div><label>${t.jf_phone} *</label><input id="a_phone" name="tel" autocomplete="tel" type="tel" dir="ltr" maxlength="20" placeholder="+966" value="${v("phone")}"></div><div><label>${t.jf_li}</label><input id="a_li" name="url" autocomplete="url" dir="ltr" maxlength="200" placeholder="https://linkedin.com/in/" value="${v("li")}"></div>`}
- else if(s==2){h=`<div><label>${t.jf_up} *</label><label class="upl"><input type="file" id="a_cv" accept=".pdf,.doc,.docx"><span id="a_fn">${AP.file?esc(AP.file.name):"⬆ "+t.jf_up}</span></label><small style="color:var(--muted)">${t.jf_max}</small></div><div><label>${t.jf_years} *</label><input id="a_years" type="number" min="0" max="60" step="1" inputmode="numeric" value="${v("years")}"></div>`}
+ else if(s==2){h=`<div><label>${t.jf_up} *</label><label class="upl"><input type="file" id="a_cv" accept=".pdf,.doc,.docx"><span id="a_fn">${AP.file?esc(AP.file.name):"⬆ "+t.jf_up}</span></label><small style="color:var(--muted)">${t.jf_max}</small></div><div><label>${t.jf_years} *</label><input id="a_years" type="number" min="0" max="60" step="1" inputmode="numeric" value="${v("years")}"></div>${afHtml()}`}
  else{h=AP.job.q.map((q,i)=>`<div><label style="color:var(--text);font-size:15px">${esc(qt(q))} *</label><select data-q="${i}"><option value="">${t.sel}</option><option value="y" ${d.ans&&d.ans[i]=="y"?"selected":""}>${t.yes}</option><option value="n" ${d.ans&&d.ans[i]=="n"?"selected":""}>${t.no}</option></select></div>`).join("")}
  $("#jb").innerHTML=`<h2 style="margin:0 0 2px">${esc(AP.job.title[lang])}</h2><div class="stp"><b>${t["j"+s]}</b><span>${t.jstep.replace("{a}",s).replace("{b}",n)}</span></div><div class="bar"><i style="width:${s/n*100}%"></i></div><div class="jf">${h}</div>${s==n?`<label class="cs"><input type="checkbox" id="a_consent" ${d.consent?"checked":""}><span>${t.consent}</span></label>`:""}<input class="hp" id="a_web" tabindex="-1" autocomplete="off" aria-hidden="true"><div class="jm ${ok?"ok":""}" id="jmsg">${msg||""}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${s>1?`<button class="btn" id="a_back">${t.back}</button>`:`<button class="btn" id="a_x">${t.back}</button>`}<button class="btn p" id="a_next">${s==n?t.jsend:t.next}</button></div>${fol(t)}`;
  if($("#a_cv"))$("#a_cv").onchange=e=>{AP.file=e.target.files[0]||null;$("#a_fn").textContent=AP.file?AP.file.name:"⬆ "+t.jf_up};
@@ -357,11 +359,11 @@ function wiz(msg,ok){const t=T[lang],n=asteps(),s=AP.step,d=AP.d,v=x=>esc(d[x]||
  $("#a_next").onclick=nextStep}
 async function nextStep(){const t=T[lang],n=asteps();grab();const d=AP.d,bad=m=>wiz(m);
  if(AP.step==1){if(!AP.job||!d.name||d.name.length<2||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email||"")||!/^[0-9+\s()-]{6,20}$/.test(d.phone||""))return bad(t.jbad);if(d.li&&!/^https?:\/\//i.test(d.li))return bad(t.jbad)}
- if(AP.step==2){if(!AP.file||!/\.(pdf|doc|docx)$/i.test(AP.file.name)||AP.file.size>4*1024*1024||!AP.file.size)return bad(t.jfile);if(d.years===""||d.years==null||+d.years<0||+d.years>60)return bad(t.jbad)}
+ if(AP.step==2){if(!AP.file||!/\.(pdf|doc|docx)$/i.test(AP.file.name)||AP.file.size>4*1024*1024||!AP.file.size)return bad(t.jfile);if(d.years===""||d.years==null||+d.years<0||+d.years>60)return bad(t.jbad);if(AF.some(f=>f.req&&!(d.x||{})[f.id]))return bad(t.jbad)}
  if(AP.step==3&&(d.ans.length!=AP.job.q.length||d.ans.some(a=>!a)))return bad(t.jbad);
  if(AP.step<n){AP.step++;return wiz()}
  if(!d.consent)return bad(t.jconsent);
- const f=new FormData();f.set("job_id",AP.job.id);f.set("name",d.name);f.set("email",d.email);f.set("phone",d.phone||"");f.set("linkedin",d.li||"");f.set("years",d.years);f.set("answers",JSON.stringify(d.ans||[]));f.set("t",AP.t0);f.set("website",$("#a_web").value);f.set("consent","1");f.set("cv",AP.file);
+ const f=new FormData();f.set("job_id",AP.job.id);f.set("name",d.name);f.set("email",d.email);f.set("phone",d.phone||"");f.set("linkedin",d.li||"");f.set("years",d.years);AF.forEach(a=>{const x=(d.x||{})[a.id];if(x)f.set("x_"+a.id,x)});f.set("answers",JSON.stringify(d.ans||[]));f.set("t",AP.t0);f.set("website",$("#a_web").value);f.set("consent","1");f.set("cv",AP.file);
  $("#a_next").disabled=true;
  try{const r=await fetch("/api/apply",{method:"POST",body:f});
   if(r.ok){$("#jb").innerHTML=`<h2 style="margin:0 0 12px">${esc(AP.job.title[lang])}</h2><p class="jm ok" style="font-size:16px">${t.jsent}</p><button class="btn" id="a_x">${t.close}</button>${fol(t)}`;$("#a_x").onclick=()=>$("#jd").close();return}
