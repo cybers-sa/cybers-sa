@@ -813,12 +813,18 @@ export default {
     const p = new URL(request.url).pathname, m = request.method;
     if (m === 'GET' && /^\/api\/(events|jobs|orgs|certs|bio|topics|links|afields)$/.test(p) && ctx && typeof caches !== 'undefined') {
       const cache = caches.default, key = new Request(request.url, { method: 'GET' });
-      const hit = await cache.match(key); if (hit) return hit;
+      const hit = await cache.match(key);
+      if (hit) { const o = new Response(hit.body, hit); o.headers.set('Cache-Control', 'no-cache'); return o; }
       const res = await this.route(request, env, p, m);
-      if (res.status === 200) { const out = new Response(res.body, res); out.headers.set('Cache-Control', 'public, max-age=30'); ctx.waitUntil(cache.put(key, out.clone())); return out; }
+      if (res.status === 200) { const out = new Response(res.body, res); out.headers.set('Cache-Control', 'public, max-age=30'); ctx.waitUntil(cache.put(key, out.clone())); const o2 = new Response(out.clone().body, out); o2.headers.set('Cache-Control', 'no-cache'); return o2; }
       return res;
     }
-    return this.route(request, env, p, m);
+    const res = await this.route(request, env, p, m);
+    if (m !== 'GET' && p.startsWith('/api/admin/') && res.status < 400 && ctx && typeof caches !== 'undefined') {
+      const o = new URL(request.url).origin;
+      ctx.waitUntil(Promise.all(['events', 'jobs', 'orgs', 'certs', 'bio', 'topics', 'links', 'afields'].map(n => caches.default.delete(new Request(o + '/api/' + n, { method: 'GET' })))));
+    }
+    return res;
   },
   async route(request, env, p, m) {
     if (m === 'GET' && (p === '/paths' || p === '/certs')) return viewPage(request, env, p);
