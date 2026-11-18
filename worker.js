@@ -520,7 +520,7 @@ async function jobPage(request, env, id) {
 const STAT_SQL = ["CREATE TABLE IF NOT EXISTS stats (day TEXT, kind TEXT, key TEXT, n INTEGER DEFAULT 0, PRIMARY KEY(day, kind, key))", "CREATE TABLE IF NOT EXISTS seen (day TEXT, h TEXT, PRIMARY KEY(day, h))"];
 let statsReady = false;
 async function ensureStats(db) { if (statsReady) return; for (const q of STAT_SQL) await db.prepare(q).run(); statsReady = true; }
-const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp', 'ct', 'cto', 'ctg', 'cpo', 'bv', 'bl', 'cm'];
+const SK = ['v', 'ev', 'reg', 'sh', 'jo', 'ja', 'jx', 's', 'cp', 'ct', 'cto', 'ctg', 'cpo', 'bv', 'bl', 'cm', 'ab'];
 const bump = (db, day, kind, key) => db.prepare('INSERT INTO stats(day,kind,key,n) VALUES(?,?,?,1) ON CONFLICT(day,kind,key) DO UPDATE SET n=n+1').bind(day, kind, key).run();
 async function track(request, env) {
   const ok = () => new Response(null, { status: 204 });
@@ -606,6 +606,25 @@ async function getLinks(db) {
     for (const k of PL) if (typeof o[k] === 'string' && /^https:\/\//i.test(o[k]) && o[k].length <= 300) out[k] = o[k];
     return out;
   } catch { return { ...PL_DEF }; }
+}
+async function getUi(db) {
+  try {
+    await db.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
+    const r = await db.prepare("SELECT v FROM settings WHERE k='addui'").first();
+    const o = r ? JSON.parse(r.v) : {};
+    return { tab: o.tab !== false, nav: o.nav !== false };
+  } catch { return { tab: true, nav: true }; }
+}
+async function adminUi(request, env) {
+  try {
+    if (request.method === 'PUT') {
+      const b = await request.json();
+      await getUi(env.DB);
+      await env.DB.prepare("INSERT INTO settings(k,v) VALUES('addui',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify({ tab: !!b.tab, nav: !!b.nav })).run();
+      return j({ ok: 1 });
+    }
+    return j(await getUi(env.DB));
+  } catch { return j({ error: 'server' }, 500); }
 }
 async function adminLinks(request, env) {
   try {
@@ -814,6 +833,7 @@ export default {
     if (p === '/api/orgs' && m === 'GET') return publicOrgs(env);
     if (p === '/api/certs' && m === 'GET') return publicCerts(request, env);
     if (p === '/api/bio' && m === 'GET') return publicBio(env);
+    if (p === '/api/ui' && m === 'GET') return new Response(JSON.stringify(await getUi(env.DB)), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
     if (p === '/api/links' && m === 'GET') return new Response(JSON.stringify(await getLinks(env.DB)), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
     if (p === '/api/jobs' && m === 'GET') return publicJobs(env);
     if (p === '/api/apply' && m === 'POST') return apply(request, env);
@@ -826,6 +846,7 @@ export default {
       if (seg[3] === 'organizers') return adminOrgs(request, env, seg[4]);
       if (seg[3] === 'stats') return adminStats(request, env);
       if (seg[3] === 'links') return adminLinks(request, env);
+      if (seg[3] === 'ui') return adminUi(request, env);
       if (seg[3] === 'bio') return adminBio(request, env, seg[4]);
       if (seg[3] === 'msgs') return adminMsgs(request, env, seg[4]);
       if (seg[3] === 'topics') return adminTopics(request, env);
