@@ -263,13 +263,13 @@ const stem=w=>w.length>4?w.replace(/^(وال|بال|لل|ال)/,''):w;
 const toks=t=>nz(t).split(' ').map(stem).filter(w=>w.length>=3&&!SW.has(w));
 function jobTerms(j){const kw=String(j.rkw||'').split(/[,،;\n]+/).map(x=>nz(x).trim()).filter(Boolean).slice(0,40);
  const f={};toks([j.title_ar,j.title_en,j.desc_ar,j.desc_en].join(' ')).forEach(w=>f[w]=(f[w]||0)+1);
- const desc=Object.keys(f).sort((a,b)=>f[b]-f[a]).slice(0,60);return{kw,desc}}
+ const desc=Object.keys(f).sort((a,b)=>f[b]-f[a]).slice(0,40);return{kw,desc}}
 function cvScore(text,j){const T=jobTerms(j);if(!T.kw.length&&!T.desc.length)return null;
  const tk=toks(text),set=new Set(tk),rev=new Set(tk.map(w=>[...w].reverse().join(''))),flat=' '+tk.join(' ')+' ',flatR=' '+[...rev].join(' ')+' ';
  const has=t=>{const s=t.split(' ').map(stem).join(' ');return set.has(s)||flat.includes(' '+s)||rev.has(s)||flatR.includes(' '+s)};
  const km=T.kw.filter(has),dm=T.desc.filter(has);
  const kc=T.kw.length?km.length/T.kw.length:0,dc=T.desc.length?dm.length/T.desc.length:0;
- const r=T.kw.length&&T.desc.length?0.7*kc+0.3*dc:T.kw.length?kc:dc;
+ const ds=Math.min(1,dc*2),r=T.kw.length&&T.desc.length?0.7*kc+0.3*ds:T.kw.length?kc:ds;
  const all=[...new Set([...km,...dm])].filter((x,i,ar)=>!ar.some((y,k)=>k!=i&&y.length>x.length&&y.includes(x)));return{pc:Math.round(r*100),m:all.slice(0,8).join('|')}}
 async function pdfText(buf){const L=await import('/vendor/pdf.min.mjs');L.GlobalWorkerOptions.workerSrc='/vendor/pdf.worker.min.mjs';
  const d=await L.getDocument({data:buf,isEvalSupported:false}).promise;let o='';for(let i=1;i<=Math.min(d.numPages,8);i++){const c=await(await d.getPage(i)).getTextContent();o+=c.items.map(x=>x.str).join(' ')+' '}return o}
