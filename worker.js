@@ -498,7 +498,7 @@ async function adminApps(request, env, id) {
     if (m === 'PUT' && id) {
       const b = await request.json();
       if (b.cvpc !== undefined && b.status === undefined) {
-        const pc = Math.max(-1, Math.min(100, parseInt(b.cvpc) || 0));
+        const pc = Math.max(-2, Math.min(100, parseInt(b.cvpc) || 0));
         await db.prepare('UPDATE applications SET cvpc=?, cvm=? WHERE id=?').bind(pc, String(b.cvm || '').slice(0, 300), id).run();
         return j({ ok: 1 });
       }
