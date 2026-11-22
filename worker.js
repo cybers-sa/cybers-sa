@@ -5,7 +5,8 @@ const j = (d, s = 200) => Response.json(d, { status: s });
 
 // التحقق من توقيع Cloudflare Access (يرجع null إذا سُمح)
 const WHO = new WeakMap();
-const PERMS = ['ev', 'jb', 'ap', 'bk', 'bkw', 'or', 'ce', 'sb', 'ms', 'bio', 'st'];
+const PERMS = ['ev', 'jb', 'ap', 'or', 'ce', 'sb', 'ms', 'bio', 'st'];
+const lvl = (pm, k) => Number((pm || {})[k]) || 0;
 let staffReady = false;
 async function ensureStaff(db) {
   if (staffReady) return;
@@ -25,6 +26,7 @@ async function resolveWho(request, env) {
   const r = await db.prepare('SELECT name,perms,active FROM staff WHERE email=?').bind(w.email).first();
   if (!r || !Number(r.active)) return null;
   let perms = {}; try { perms = JSON.parse(r.perms || '{}'); } catch {}
+  if (!perms.v) { const n = { v: 2, jball: perms.jball ? 1 : 0 }; for (const k of PERMS) if (perms[k]) n[k] = 2; if (perms.bk) n.bk = perms.bkw ? 2 : 1; perms = n; }
   w.owner = false; w.perms = perms; w.name = r.name || '';
   return w;
 }
@@ -32,10 +34,11 @@ const SEGPERM = { events: 'ev', organizers: 'or', stats: 'st', links: 'bio', ui:
 function allowed(w, seg, m) {
   if (w.owner) return true;
   const k = SEGPERM[seg]; if (!k) return false;
-  const pm = w.perms || {};
-  if (pm[k] || ((seg === 'apps' || seg === 'cv') && pm.bk)) return true;
-  // قراءة القوائم المساعدة لنموذج الوظيفة
-  if (m === 'GET' && pm.jb && (seg === 'organizers' || seg === 'afields')) return true;
+  const pm = w.perms || {}, need = m === 'GET' ? 1 : m === 'DELETE' ? 3 : 2;
+  let l = lvl(pm, k);
+  if (seg === 'apps' || seg === 'cv') l = Math.max(lvl(pm, 'ap'), lvl(pm, 'bk') >= 2 ? 2 : lvl(pm, 'bk'));
+  if (l >= need) return true;
+  if (m === 'GET' && lvl(pm, 'jb') >= 1 && (seg === 'organizers' || seg === 'afields')) return true;
   return false;
 }
 async function auth(request, env) {
@@ -490,10 +493,10 @@ async function adminApps(request, env, id) {
   const m = request.method, db = env.DB;
   try {
     await ensureJobs(db);
-    const w = WHO.get(request) || {}, pm = w.perms || {}, scoped = !w.owner && !pm.jball && !pm.bk;
+    const w = WHO.get(request) || {}, pm = w.perms || {}, bk = lvl(pm, 'bk'), ap = lvl(pm, 'ap'), scoped = !w.owner && !pm.jball && bk < 1;
     if (!w.owner && m === 'POST' && id === 'bulk') return j({ error: 'forbidden' }, 403);
-    if (!w.owner && m === 'PUT' && id && !pm.jball && !pm.bkw && !pm.ap) return j({ error: 'forbidden' }, 403);
-    if (!w.owner && m === 'PUT' && id && !pm.jball && !pm.bkw) { const o = await db.prepare('SELECT j.oby FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=?').bind(id).first(); if (!o || o.oby !== w.email) return j({ error: 'forbidden' }, 403); }
+    if (!w.owner && m === 'PUT' && id && bk < 2 && ap < 2) return j({ error: 'forbidden' }, 403);
+    if (!w.owner && m === 'PUT' && id && !pm.jball && bk < 2) { const o = await db.prepare('SELECT j.oby FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=?').bind(id).first(); if (!o || o.oby !== w.email) return j({ error: 'forbidden' }, 403); }
     if (m === 'GET') return j((await db.prepare('SELECT id,job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_size,status,note,created_at,extra,noms,cvpc,cvm FROM applications' + (scoped ? ' WHERE job_id IN (SELECT id FROM jobs WHERE oby=?)' : '') + ' ORDER BY id DESC').bind(...(scoped ? [w.email] : [])).all()).results.map(r => ({ ...r, extra: (() => { try { return JSON.parse(r.extra || '{}'); } catch { return {}; } })(), noms: (() => { try { return JSON.parse(r.noms || '[]'); } catch { return []; } })(), answers: (() => { try { return JSON.parse(r.answers || '[]'); } catch { return []; } })() })));
     if (m === 'PUT' && id) {
       const b = await request.json();
@@ -528,7 +531,7 @@ async function adminApps(request, env, id) {
 async function adminCv(env, id, view, who) {
   try {
     await ensureJobs(env.DB);
-    if (who && !who.owner && !(who.perms && (who.perms.jball || who.perms.bk))) { const o = await env.DB.prepare('SELECT j.oby FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=?').bind(id).first(); if (!o || o.oby !== who.email) return new Response('Forbidden', { status: 403 }); }
+    if (who && !who.owner && !(who.perms && (who.perms.jball || lvl(who.perms, 'bk') >= 1))) { const o = await env.DB.prepare('SELECT j.oby FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=?').bind(id).first(); if (!o || o.oby !== who.email) return new Response('Forbidden', { status: 403 }); }
     const a = await env.DB.prepare('SELECT name,cv_name,cv_type FROM applications WHERE id=?').bind(id).first();
     if (!a) return new Response('Not found', { status: 404 });
     const rows = (await env.DB.prepare('SELECT data FROM cv_chunks WHERE app_id=? ORDER BY n').bind(id).all()).results;
@@ -693,9 +696,10 @@ async function adminStaff(request, env, id) {
       const b = await request.json();
       const email = String(b.email || '').trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 120) return j({ error: 'email' }, 400);
-      const perms = {}; for (const k of PERMS) perms[k] = b.perms && b.perms[k] ? 1 : 0;
-      perms.jball = b.perms && b.perms.jball ? 1 : 0;
-      if (!perms.bk) perms.bkw = 0;
+      const bp = b.perms || {}, perms = { v: 2 };
+      for (const k of PERMS) perms[k] = Math.max(0, Math.min(3, parseInt(bp[k]) || 0));
+      perms.bk = Math.max(0, Math.min(2, parseInt(bp.bk) || 0));
+      perms.jball = bp.jball ? 1 : 0;
       await db.prepare("INSERT INTO staff(email,name,perms,active,created) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name, perms=excluded.perms").bind(email, String(b.name || '').slice(0, 60), JSON.stringify(perms), 1, new Date().toISOString()).run();
       return j({ ok: 1 });
     }
