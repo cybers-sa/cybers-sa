@@ -937,7 +937,7 @@ export default {
       const seg = p.split('/');
       const who = await resolveWho(request, env);
       if (!who) return new Response('Forbidden', { status: 403 });
-      if (seg[3] === 'me') return j({ email: who.email, owner: !!who.owner, name: who.name || '', perms: who.perms || {} });
+      if (seg[3] === 'me') return j({ email: who.email, owner: !!who.owner, name: who.name || '', perms: who.perms || {}, team: /^[a-z0-9.-]+$/i.test(env.TEAM_DOMAIN || '') ? env.TEAM_DOMAIN : '' });
       if (seg[3] === 'log') return who.owner ? adminLog(request, env) : new Response('Forbidden', { status: 403 });
       if (seg[3] === 'staff') return who.owner ? adminStaff(request, env, seg[4]) : new Response('Forbidden', { status: 403 });
       if (!who.owner && seg[3] === 'afields' && m !== 'GET') return new Response('Forbidden', { status: 403 });
