@@ -310,8 +310,8 @@ async function ensureJobs(db) {
   for (const q of [JOB_SQL, APP_SQL, CV_SQL]) await db.prepare(q).run();
   for (const q of ['CREATE INDEX IF NOT EXISTS ix_app_job ON applications(job_id)']) { try { await db.prepare(q).run(); } catch {} }
   await ensureOrg(db);
-  await addCols(db, 'jobs', { oby: '', exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0], rspec: '', ryears: ['REAL', 0], afcfg: '{}' });
-  await addCols(db, 'applications', { extra: '{}', noms: '[]' });
+  await addCols(db, 'jobs', { oby: '', exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0], rspec: '', ryears: ['REAL', 0], afcfg: '{}', rkw: '' });
+  await addCols(db, 'applications', { extra: '{}', noms: '[]', cvpc: ['INTEGER', -1], cvm: '' });
   jobsReady = true;
 }
 
@@ -460,9 +460,9 @@ function jclean(b) {
   const s = (k, n = 300) => String(b[k] ?? '').trim().slice(0, n);
   const qs = (Array.isArray(b.questions) ? b.questions : []).map(x => String(x).trim().slice(0, 250)).filter(Boolean).slice(0, 10);
   return [s('title_ar'), s('title_en'), s('org'), b.city === '' ? '' : CITIES.concat('x').includes(b.city) ? b.city : 'r', b.mode === '' ? '' : JMODES.includes(b.mode) ? b.mode : 'onsite',
-    b.kind === '' ? '' : KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0)), b.pinned ? 1 : 0, /^[a-z0-9]{2,12}$/.test(s('rspec')) ? s('rspec') : '', Math.min(60, Math.max(0, Number(b.ryears) || 0)), afcfgClean(b.afcfg)];
+    b.kind === '' ? '' : KINDS.includes(b.kind) ? b.kind : 'full', s('desc_ar', 3000), s('desc_en', 3000), JSON.stringify(qs), DATE.test(s('deadline')) ? s('deadline') : '', b.closed ? 1 : 0, b.published ? 1 : 0, s('exp', 20), s('place', 150), /^https?:\/\//i.test(s('link')) ? s('link') : '', Math.min(100000, Math.max(0, parseInt(b.max_apps) || 0)), b.pinned ? 1 : 0, /^[a-z0-9]{2,12}$/.test(s('rspec')) ? s('rspec') : '', Math.min(60, Math.max(0, Number(b.ryears) || 0)), afcfgClean(b.afcfg), s('rkw', 500)];
 }
-const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps,pinned,rspec,ryears,afcfg'.split(',');
+const JC = 'title_ar,title_en,org,city,mode,kind,desc_ar,desc_en,questions,deadline,closed,published,exp,place,link,max_apps,pinned,rspec,ryears,afcfg,rkw'.split(',');
 async function adminJobs(request, env, id) {
   const m = request.method, db = env.DB;
   try {
@@ -494,9 +494,14 @@ async function adminApps(request, env, id) {
     if (!w.owner && m === 'POST' && id === 'bulk') return j({ error: 'forbidden' }, 403);
     if (!w.owner && m === 'PUT' && id && !pm.jball && !pm.bkw && !pm.ap) return j({ error: 'forbidden' }, 403);
     if (!w.owner && m === 'PUT' && id && !pm.jball && !pm.bkw) { const o = await db.prepare('SELECT j.oby FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=?').bind(id).first(); if (!o || o.oby !== w.email) return j({ error: 'forbidden' }, 403); }
-    if (m === 'GET') return j((await db.prepare('SELECT id,job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_size,status,note,created_at,extra,noms FROM applications' + (scoped ? ' WHERE job_id IN (SELECT id FROM jobs WHERE oby=?)' : '') + ' ORDER BY id DESC').bind(...(scoped ? [w.email] : [])).all()).results.map(r => ({ ...r, extra: (() => { try { return JSON.parse(r.extra || '{}'); } catch { return {}; } })(), noms: (() => { try { return JSON.parse(r.noms || '[]'); } catch { return []; } })(), answers: (() => { try { return JSON.parse(r.answers || '[]'); } catch { return []; } })() })));
+    if (m === 'GET') return j((await db.prepare('SELECT id,job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_size,status,note,created_at,extra,noms,cvpc,cvm FROM applications' + (scoped ? ' WHERE job_id IN (SELECT id FROM jobs WHERE oby=?)' : '') + ' ORDER BY id DESC').bind(...(scoped ? [w.email] : [])).all()).results.map(r => ({ ...r, extra: (() => { try { return JSON.parse(r.extra || '{}'); } catch { return {}; } })(), noms: (() => { try { return JSON.parse(r.noms || '[]'); } catch { return []; } })(), answers: (() => { try { return JSON.parse(r.answers || '[]'); } catch { return []; } })() })));
     if (m === 'PUT' && id) {
       const b = await request.json();
+      if (b.cvpc !== undefined && b.status === undefined) {
+        const pc = Math.max(-1, Math.min(100, parseInt(b.cvpc) || 0));
+        await db.prepare('UPDATE applications SET cvpc=?, cvm=? WHERE id=?').bind(pc, String(b.cvm || '').slice(0, 300), id).run();
+        return j({ ok: 1 });
+      }
       if (!ASTAT.includes(b.status)) return j({ error: 'bad' }, 400);
       await db.prepare('UPDATE applications SET status=?, note=? WHERE id=?').bind(b.status, String(b.note ?? '').slice(0, 500), id).run();
       if (Array.isArray(b.noms)) await db.prepare('UPDATE applications SET noms=? WHERE id=?').bind(JSON.stringify(nomsClean(b.noms)), id).run();
@@ -900,7 +905,7 @@ export default {
     const res = await this.route(request, env, p, m);
     if (m !== 'GET' && p.startsWith('/api/admin/') && res.status < 400 && ctx) {
       const w = WHO.get(request), sg = p.split('/');
-      if (w && w.email) ctx.waitUntil(env.DB.prepare('INSERT INTO audit(at,email,owner,method,area,target,detail) VALUES(?,?,?,?,?,?,?)').bind(new Date().toISOString(), w.email, w.owner ? 1 : 0, m, sg[3] || '', (sg[4] || '').slice(0, 60), det).run().catch(() => {}));
+      if (w && w.email && new URL(request.url).searchParams.get('score') !== '1') ctx.waitUntil(env.DB.prepare('INSERT INTO audit(at,email,owner,method,area,target,detail) VALUES(?,?,?,?,?,?,?)').bind(new Date().toISOString(), w.email, w.owner ? 1 : 0, m, sg[3] || '', (sg[4] || '').slice(0, 60), det).run().catch(() => {}));
     }
     if (m !== 'GET' && p.startsWith('/api/admin/') && res.status < 400 && ctx && typeof caches !== 'undefined') {
       const o = new URL(request.url).origin;
