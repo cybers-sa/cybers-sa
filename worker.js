@@ -11,6 +11,7 @@ async function ensureStaff(db) {
   if (staffReady) return;
   await db.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
   await db.prepare('CREATE TABLE IF NOT EXISTS staff (email TEXT PRIMARY KEY, name TEXT DEFAULT \'\', perms TEXT DEFAULT \'{}\', active INTEGER DEFAULT 1, created TEXT DEFAULT \'\', last_seen TEXT DEFAULT \'\', n INTEGER DEFAULT 0)').run();
+  await db.prepare('CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, email TEXT, owner INTEGER, method TEXT, area TEXT, target TEXT, detail TEXT)').run();
   staffReady = true;
 }
 // تحديد هوية الداخل: المالك (أول دخول بعد التفعيل) أو موظف مضاف ونشط
@@ -667,6 +668,17 @@ async function adminUi(request, env) {
     return j(await getUi(env.DB));
   } catch { return j({ error: 'server' }, 500); }
 }
+async function adminLog(request, env) {
+  try {
+    await ensureStaff(env.DB);
+    const u = new URL(request.url), e = (u.searchParams.get('e') || '').toLowerCase(), a = u.searchParams.get('a') || '';
+    const cond = [], bind = [];
+    if (e) { cond.push('email=?'); bind.push(e); }
+    if (a) { cond.push('area=?'); bind.push(a); }
+    const r = await env.DB.prepare('SELECT id,at,email,owner,method,area,target,detail FROM audit' + (cond.length ? ' WHERE ' + cond.join(' AND ') : '') + ' ORDER BY id DESC LIMIT 300').bind(...bind).all();
+    return j(r.results);
+  } catch { return j({ error: 'server' }, 500); }
+}
 async function adminStaff(request, env, id) {
   const db = env.DB, m = request.method;
   try {
@@ -883,7 +895,13 @@ export default {
       if (res.status === 200) { const out = new Response(res.body, res); out.headers.set('Cache-Control', 'public, max-age=30'); ctx.waitUntil(cache.put(key, out.clone())); const o2 = new Response(out.clone().body, out); o2.headers.set('Cache-Control', 'no-cache'); return o2; }
       return res;
     }
+    let det = '';
+    if (m !== 'GET' && p.startsWith('/api/admin/') && Number(request.headers.get('content-length') || 0) < 200000) { try { const b = await request.clone().json(); det = String(b.title_ar || b.name || b.email || b.status || b.title || '').slice(0, 80); } catch {} }
     const res = await this.route(request, env, p, m);
+    if (m !== 'GET' && p.startsWith('/api/admin/') && res.status < 400 && ctx) {
+      const w = WHO.get(request), sg = p.split('/');
+      if (w && w.email) ctx.waitUntil(env.DB.prepare('INSERT INTO audit(at,email,owner,method,area,target,detail) VALUES(?,?,?,?,?,?,?)').bind(new Date().toISOString(), w.email, w.owner ? 1 : 0, m, sg[3] || '', (sg[4] || '').slice(0, 60), det).run().catch(() => {}));
+    }
     if (m !== 'GET' && p.startsWith('/api/admin/') && res.status < 400 && ctx && typeof caches !== 'undefined') {
       const o = new URL(request.url).origin;
       ctx.waitUntil(Promise.all(['events', 'jobs', 'orgs', 'certs', 'bio', 'topics', 'links', 'afields'].map(n => caches.default.delete(new Request(o + '/api/' + n, { method: 'GET' })))));
@@ -915,6 +933,7 @@ export default {
       const who = await resolveWho(request, env);
       if (!who) return new Response('Forbidden', { status: 403 });
       if (seg[3] === 'me') return j({ email: who.email, owner: !!who.owner, name: who.name || '', perms: who.perms || {} });
+      if (seg[3] === 'log') return who.owner ? adminLog(request, env) : new Response('Forbidden', { status: 403 });
       if (seg[3] === 'staff') return who.owner ? adminStaff(request, env, seg[4]) : new Response('Forbidden', { status: 403 });
       if (!who.owner && seg[3] === 'afields' && m !== 'GET') return new Response('Forbidden', { status: 403 });
       if (!who.owner && seg[3] === 'afields' && !(who.perms.jb || who.perms.ap)) return new Response('Forbidden', { status: 403 });
