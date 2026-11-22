@@ -4,6 +4,39 @@ const SEC = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'R
 const j = (d, s = 200) => Response.json(d, { status: s });
 
 // التحقق من توقيع Cloudflare Access (يرجع null إذا سُمح)
+const WHO = new WeakMap();
+const PERMS = ['ev', 'jb', 'ap', 'or', 'ce', 'sb', 'ms', 'bio', 'st'];
+let staffReady = false;
+async function ensureStaff(db) {
+  if (staffReady) return;
+  await db.prepare('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)').run();
+  await db.prepare('CREATE TABLE IF NOT EXISTS staff (email TEXT PRIMARY KEY, name TEXT DEFAULT \'\', perms TEXT DEFAULT \'{}\', active INTEGER DEFAULT 1, created TEXT DEFAULT \'\', last_seen TEXT DEFAULT \'\', n INTEGER DEFAULT 0)').run();
+  staffReady = true;
+}
+// تحديد هوية الداخل: المالك (أول دخول بعد التفعيل) أو موظف مضاف ونشط
+async function resolveWho(request, env) {
+  const w = WHO.get(request);
+  if (!w || !w.email) return null;
+  const db = env.DB; await ensureStaff(db);
+  let o = await db.prepare("SELECT v FROM settings WHERE k='owner'").first();
+  if (!o) { await db.prepare("INSERT OR IGNORE INTO settings(k,v) VALUES('owner',?)").bind(w.email).run(); o = await db.prepare("SELECT v FROM settings WHERE k='owner'").first(); }
+  if (o && o.v === w.email) { w.owner = true; return w; }
+  const r = await db.prepare('SELECT name,perms,active FROM staff WHERE email=?').bind(w.email).first();
+  if (!r || !Number(r.active)) return null;
+  let perms = {}; try { perms = JSON.parse(r.perms || '{}'); } catch {}
+  w.owner = false; w.perms = perms; w.name = r.name || '';
+  return w;
+}
+const SEGPERM = { events: 'ev', organizers: 'or', stats: 'st', links: 'bio', ui: 'bio', bio: 'bio', topics: 'bio', msgs: 'ms', certs: 'ce', jobs: 'jb', apps: 'ap', cv: 'ap', submissions: 'sb' };
+function allowed(w, seg, m) {
+  if (w.owner) return true;
+  const k = SEGPERM[seg]; if (!k) return false;
+  const pm = w.perms || {};
+  if (pm[k]) return true;
+  // قراءة القوائم المساعدة لنموذج الوظيفة
+  if (m === 'GET' && pm.jb && (seg === 'organizers' || seg === 'afields')) return true;
+  return false;
+}
 async function auth(request, env) {
   const deny = new Response('Unauthorized', { status: 401 });
   const t = request.headers.get('Cf-Access-Jwt-Assertion');
@@ -17,6 +50,7 @@ async function auth(request, env) {
     const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, dec(s), new TextEncoder().encode(h + '.' + p));
     const pl = JSON.parse(txt(dec(p)));
     if (!ok || ![].concat(pl.aud).includes(env.POLICY_AUD) || pl.exp * 1000 < Date.now()) return deny;
+    if (pl.email) WHO.set(request, { email: String(pl.email).toLowerCase() });
   } catch { return deny; }
   return null;
 }
@@ -275,7 +309,7 @@ async function ensureJobs(db) {
   for (const q of [JOB_SQL, APP_SQL, CV_SQL]) await db.prepare(q).run();
   for (const q of ['CREATE INDEX IF NOT EXISTS ix_app_job ON applications(job_id)']) { try { await db.prepare(q).run(); } catch {} }
   await ensureOrg(db);
-  await addCols(db, 'jobs', { exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0], rspec: '', ryears: ['REAL', 0], afcfg: '{}' });
+  await addCols(db, 'jobs', { oby: '', exp: '', place: '', link: '', max_apps: ['INTEGER', 0], pinned: ['INTEGER', 0], rspec: '', ryears: ['REAL', 0], afcfg: '{}' });
   await addCols(db, 'applications', { extra: '{}', noms: '[]' });
   jobsReady = true;
 }
@@ -432,14 +466,16 @@ async function adminJobs(request, env, id) {
   const m = request.method, db = env.DB;
   try {
     await ensureJobs(db);
-    if (m === 'GET') return j((await db.prepare('SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id=j.id) n FROM jobs j ORDER BY j.id DESC').all()).results.map(r => ({ ...r, max_apps: Number(r.max_apps) || 0, questions: jq(r.questions) })));
+    const w = WHO.get(request) || {}, scoped = !w.owner && !(w.perms && w.perms.jball);
+    if (scoped && id && (m === 'PUT' || m === 'DELETE')) { const o = await db.prepare('SELECT oby FROM jobs WHERE id=?').bind(id).first(); if (!o || o.oby !== w.email) return j({ error: 'forbidden' }, 403); }
+    if (m === 'GET') return j((await (scoped ? db.prepare('SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id=j.id) n FROM jobs j WHERE j.oby=? ORDER BY j.id DESC').bind(w.email) : db.prepare('SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id=j.id) n FROM jobs j ORDER BY j.id DESC')).all()).results.map(r => ({ ...r, max_apps: Number(r.max_apps) || 0, questions: jq(r.questions) })));
     if (m === 'POST' || (m === 'PUT' && id)) {
       const b = await request.json();
       if (!String(b.title_ar || '').trim()) return j({ error: 'title' }, 400);
       if (!dOk(String(b.deadline || '').trim())) return j({ error: 'dates' }, 400);
       if (b.org_logo && !logoOk(b.org_logo)) return j({ error: 'logo' }, 400);
       const v = jclean(b);
-      if (m === 'POST') await db.prepare(`INSERT INTO jobs(${JC}) VALUES(${JC.map(() => '?')})`).bind(...v).run();
+      if (m === 'POST') { const r = await db.prepare(`INSERT INTO jobs(${JC}) VALUES(${JC.map(() => '?')})`).bind(...v).run(); const nid = r && r.meta && r.meta.last_row_id; if (nid) await db.prepare('UPDATE jobs SET oby=? WHERE id=?').bind(w.email || '', nid).run(); }
       else await db.prepare(`UPDATE jobs SET ${JC.map(c => c + '=?')} WHERE id=?`).bind(...v, id).run();
       if (b.org_logo) await saveLogo(db, b.org, b.org_logo, b.org_og);
       return j({ ok: 1 }, m === 'POST' ? 201 : 200);
@@ -453,7 +489,10 @@ async function adminApps(request, env, id) {
   const m = request.method, db = env.DB;
   try {
     await ensureJobs(db);
-    if (m === 'GET') return j((await db.prepare('SELECT id,job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_size,status,note,created_at,extra,noms FROM applications ORDER BY id DESC').all()).results.map(r => ({ ...r, extra: (() => { try { return JSON.parse(r.extra || '{}'); } catch { return {}; } })(), noms: (() => { try { return JSON.parse(r.noms || '[]'); } catch { return []; } })(), answers: (() => { try { return JSON.parse(r.answers || '[]'); } catch { return []; } })() })));
+    const w = WHO.get(request) || {}, scoped = !w.owner && !(w.perms && w.perms.jball);
+    if (scoped && m === 'POST' && id === 'bulk') return j({ error: 'forbidden' }, 403);
+    if (scoped && id && id !== 'bulk') { const o = await db.prepare('SELECT j.oby FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=?').bind(id).first(); if (!o || o.oby !== w.email) return j({ error: 'forbidden' }, 403); }
+    if (m === 'GET') return j((await db.prepare('SELECT id,job_id,job_title,name,email,phone,linkedin,years,answers,cv_name,cv_size,status,note,created_at,extra,noms FROM applications' + (scoped ? ' WHERE job_id IN (SELECT id FROM jobs WHERE oby=?)' : '') + ' ORDER BY id DESC').bind(...(scoped ? [w.email] : [])).all()).results.map(r => ({ ...r, extra: (() => { try { return JSON.parse(r.extra || '{}'); } catch { return {}; } })(), noms: (() => { try { return JSON.parse(r.noms || '[]'); } catch { return []; } })(), answers: (() => { try { return JSON.parse(r.answers || '[]'); } catch { return []; } })() })));
     if (m === 'PUT' && id) {
       const b = await request.json();
       if (!ASTAT.includes(b.status)) return j({ error: 'bad' }, 400);
@@ -479,9 +518,10 @@ async function adminApps(request, env, id) {
   return j({ error: 'bad request' }, 400);
 }
 
-async function adminCv(env, id, view) {
+async function adminCv(env, id, view, who) {
   try {
     await ensureJobs(env.DB);
+    if (who && !who.owner && !(who.perms && who.perms.jball)) { const o = await env.DB.prepare('SELECT j.oby FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=?').bind(id).first(); if (!o || o.oby !== who.email) return new Response('Forbidden', { status: 403 }); }
     const a = await env.DB.prepare('SELECT name,cv_name,cv_type FROM applications WHERE id=?').bind(id).first();
     if (!a) return new Response('Not found', { status: 404 });
     const rows = (await env.DB.prepare('SELECT data FROM cv_chunks WHERE app_id=? ORDER BY n').bind(id).all()).results;
@@ -625,6 +665,28 @@ async function adminUi(request, env) {
     }
     return j(await getUi(env.DB));
   } catch { return j({ error: 'server' }, 500); }
+}
+async function adminStaff(request, env, id) {
+  const db = env.DB, m = request.method;
+  try {
+    await ensureStaff(db);
+    if (m === 'GET') return j((await db.prepare('SELECT email,name,perms,active,created,last_seen,n FROM staff ORDER BY created DESC').all()).results.map(r => { let p = {}; try { p = JSON.parse(r.perms || '{}'); } catch {} return { ...r, perms: p, active: Number(r.active) }; }));
+    if (m === 'POST') {
+      const b = await request.json();
+      const email = String(b.email || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 120) return j({ error: 'email' }, 400);
+      const perms = {}; for (const k of PERMS) perms[k] = b.perms && b.perms[k] ? 1 : 0;
+      perms.jball = b.perms && b.perms.jball ? 1 : 0;
+      await db.prepare("INSERT INTO staff(email,name,perms,active,created) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name, perms=excluded.perms").bind(email, String(b.name || '').slice(0, 60), JSON.stringify(perms), 1, new Date().toISOString()).run();
+      return j({ ok: 1 });
+    }
+    if (m === 'PUT' && id) {
+      const b = await request.json();
+      await db.prepare('UPDATE staff SET active=? WHERE email=?').bind(b.active ? 1 : 0, decodeURIComponent(id).toLowerCase()).run();
+      return j({ ok: 1 });
+    }
+  } catch { return j({ error: 'server' }, 500); }
+  return j({ error: 'bad request' }, 400);
 }
 async function adminLinks(request, env) {
   try {
@@ -848,6 +910,14 @@ export default {
       const deny = await auth(request, env);
       if (deny) return deny;
       const seg = p.split('/');
+      const who = await resolveWho(request, env);
+      if (!who) return new Response('Forbidden', { status: 403 });
+      if (seg[3] === 'me') return j({ email: who.email, owner: !!who.owner, name: who.name || '', perms: who.perms || {} });
+      if (seg[3] === 'staff') return who.owner ? adminStaff(request, env, seg[4]) : new Response('Forbidden', { status: 403 });
+      if (!who.owner && seg[3] === 'afields' && m !== 'GET') return new Response('Forbidden', { status: 403 });
+      if (!who.owner && seg[3] === 'afields' && !(who.perms.jb || who.perms.ap)) return new Response('Forbidden', { status: 403 });
+      if (!who.owner && seg[3] !== 'afields' && !allowed(who, seg[3], m)) return new Response('Forbidden', { status: 403 });
+      if (!who.owner && m !== 'GET') { try { await env.DB.prepare('UPDATE staff SET n=n+1,last_seen=? WHERE email=?').bind(new Date().toISOString(), who.email).run(); } catch {} }
       if (seg[3] === 'events') return admin(request, env, seg[4]);
       if (seg[3] === 'organizers') return adminOrgs(request, env, seg[4]);
       if (seg[3] === 'stats') return adminStats(request, env);
@@ -860,7 +930,7 @@ export default {
       if (seg[3] === 'certs') return adminCerts(request, env, seg[4]);
       if (seg[3] === 'jobs') return adminJobs(request, env, seg[4]);
       if (seg[3] === 'apps') return adminApps(request, env, seg[4]);
-      if (seg[3] === 'cv' && seg[4]) return adminCv(env, seg[4], new URL(request.url).searchParams.get('view'));
+      if (seg[3] === 'cv' && seg[4]) return adminCv(env, seg[4], new URL(request.url).searchParams.get('view'), who);
       if (seg[3] === 'submissions') return adminSubs(request, env, seg.slice(4));
     }
     return env.ASSETS.fetch(request);
